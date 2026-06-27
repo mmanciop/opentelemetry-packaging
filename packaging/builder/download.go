@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -296,4 +297,108 @@ func extractZipFile(f *zip.File, destDir string) error {
 
 	_, err = io.Copy(out, rc)
 	return err
+}
+
+// pipTimeout is the maximum duration for a pip subprocess.
+const pipTimeout = 10 * time.Minute
+
+// downloadPythonAgent installs Python auto-instrumentation packages into destDir using pip.
+// pip must be available on PATH. The packages installed are defined by
+// packaging/common/python/requirements.txt.
+func downloadPythonAgent(cfg Config, destDir string) error {
+	requirementsFile := filepath.Join(cfg.PackagingDir, "common", "python", "requirements.txt")
+
+	fmt.Printf("  Installing Python OTel packages via pip into %s\n", destDir)
+
+	ctx, cancel := context.WithTimeout(context.Background(), pipTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "pip", "install",
+		"--target", destDir,
+		"--no-compile",
+		"--quiet",
+		"-r", requirementsFile,
+	)
+	cmd.Env = append(os.Environ(), "PIP_DISABLE_PIP_VERSION_CHECK=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("pip install failed: %s\n%w", string(out), err)
+	}
+	return nil
+}
+
+// copyFile copies src to dst, creating dst with the same permissions as src.
+func copyFile(src, dst string) (retErr error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
+	if err != nil {
+		return err
+	}
+	defer func() {
+		closeErr := out.Close()
+		if retErr == nil {
+			retErr = closeErr
+		}
+	}()
+
+	_, retErr = io.Copy(out, in)
+	return retErr
+}
+
+// generateAllDependencies walks installDir for *.dist-info/METADATA files, parses the
+// Name and Version fields, and writes a sorted list of "name==version" requirement
+// strings to outputPath. sitecustomize.py reads this file at runtime to detect version
+// conflicts between the bundled packages and the application's own dependencies.
+func generateAllDependencies(installDir, outputPath string) error {
+	entries, err := os.ReadDir(installDir)
+	if err != nil {
+		return err
+	}
+
+	var lines []string
+	for _, entry := range entries {
+		if !entry.IsDir() || !strings.HasSuffix(entry.Name(), ".dist-info") {
+			continue
+		}
+		metadataPath := filepath.Join(installDir, entry.Name(), "METADATA")
+		data, err := os.ReadFile(metadataPath)
+		if err != nil {
+			continue
+		}
+		name, version := parseMetadata(string(data))
+		if name != "" && version != "" {
+			lines = append(lines, fmt.Sprintf("%s==%s", name, version))
+		}
+	}
+
+	sort.Strings(lines)
+	content := strings.Join(lines, "\n")
+	if len(lines) > 0 {
+		content += "\n"
+	}
+	return os.WriteFile(outputPath, []byte(content), 0o644)
+}
+
+// parseMetadata extracts the Name and Version from a PEP 566 METADATA file (RFC 822 format).
+func parseMetadata(data string) (name, version string) {
+	for _, line := range strings.Split(data, "\n") {
+		if name != "" && version != "" {
+			break
+		}
+		if rest, ok := strings.CutPrefix(line, "Name: "); ok {
+			name = strings.TrimSpace(rest)
+		} else if rest, ok := strings.CutPrefix(line, "Version: "); ok {
+			version = strings.TrimSpace(rest)
+		}
+	}
+	return name, version
 }
