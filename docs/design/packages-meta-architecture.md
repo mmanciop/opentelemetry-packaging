@@ -164,6 +164,9 @@ At runtime, the library inspects each process to determine if it is a Java, Node
 
 The post-install and pre-uninstall scripts must use only POSIX shell builtins (`read`, `case`, shell redirection) to avoid dependencies on `sed` or `grep`.
 
+The pre-uninstall script must not clean up on upgrade (dpkg passes `upgrade` as `$1`, rpm passes the remaining-instance count `1`).
+This matters on RPM in particular: the old version's `%preun` runs after the new version's `%post`, so an unguarded cleanup would strip the `/etc/ld.so.preload` entry the new version just configured.
+
 #### Injector interface versioning
 
 The injector declares `Provides: opentelemetry-injector1`.
