@@ -1,0 +1,22 @@
+Origin: OpenTelemetry
+Label: OpenTelemetry
+Suite: stable
+Codename: stable
+Architectures: amd64 arm64 all
+Components: main
+Description: OpenTelemetry auto-instrumentation packages for Linux
+Date: Mon, 13 Jul 2026 15:24:50 UTC
+MD5Sum:
+ 3a103b178f0bf70446665e0a0d8595f4 1955 main/binary-all/Packages
+ 2b4faed1c4e12607b6fe8145ed160c92 694 main/binary-all/Packages.gz
+ b308bd5ff342be3c246defebbbb1e067 3780 main/binary-amd64/Packages
+ 295ed8c0395041dfa8338ae3ca3b32da 1115 main/binary-amd64/Packages.gz
+ 4a8dec97c742425eb00e391c368f6702 3780 main/binary-arm64/Packages
+ 1dfe24eca604da8e532161fc588e75d5 1114 main/binary-arm64/Packages.gz
+SHA256:
+ 10f2f4c529f2097e0c246f7ee83aea1a38c53868b16304521ead67c842be0fa1 1955 main/binary-all/Packages
+ 2dc2deda9cab97c3341b508f954fa472204ea1d15e4e7768988f5b721ccfdaf5 694 main/binary-all/Packages.gz
+ d8c6c4db8c62a23e2ae99c77b5e3af1624be2c954b7fc1ee16deb8e897a33177 3780 main/binary-amd64/Packages
+ 8a1e2740198b3c5e0938296572cc5214d6e87119f8db5ba11c99cab79ca69f8e 1115 main/binary-amd64/Packages.gz
+ 8bf8b972efd4d044d8cf30cd5f3ffe5547e1393e6b130360ceff7adc3f31514d 3780 main/binary-arm64/Packages
+ d05aadef830e78e7622cff64eb9906285422b7bfe62652223acf756e7ad9115b 1114 main/binary-arm64/Packages.gz
