@@ -1,0 +1,24 @@
+# Build output
+/build/
+/build-packages
+
+# Go
+*.exe
+
+# Python
+__pycache__/
+
+# .NET
+bin/
+obj/
+
+# Agentic configs
+.agents
+.claude
+# Working artifacts (scratch; not versioned). docs/design/ is kept.
+docs/notes/
+docs/plans/
+docs/brainstorms/
+
+# Stray root build artifact from direct otel-config-check builds
+/otel-config-check

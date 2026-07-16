@@ -1,0 +1,97 @@
+# Modelled after
+# https://github.com/dash0hq/dash0-operator/blob/main/images/instrumentation/python/requirements.txt
+# (Copyright 2026 Dash0 Inc., Apache-2.0 — see the NOTICE file at the repository root)
+# with opentelemetry-exporter-otlp-proto-http replaced by opentelemetry-exporter-otlp-pyproto-http
+# (pure-Python protobuf, no google-protobuf C-extension dependency).
+
+opentelemetry-distro==0.64b0
+
+# The file-configuration extra (pyyaml, jsonschema) enables declarative
+# configuration via OTEL_CONFIG_FILE; without it, setting that variable makes
+# the configurator crash with ModuleNotFoundError.
+opentelemetry-sdk[file-configuration]==1.43.0
+
+urllib3 <2.6.4
+
+# TODO: publish the pure-Python pyproto exporter chain to PyPI and replace the
+# three vendored requirements below with a single pinned release, e.g.:
+#   opentelemetry-exporter-otlp-pyproto-http==<version>
+#
+# Until published, the exporter and its two pyproto-only dependencies are
+# developed in this repository under vendor/ — see vendor/README.md.
+# They are pure-Python (no google-protobuf C extension) and are
+# installed from source by the build's source pass with --no-deps; their only
+# dependencies beyond each other (opentelemetry-api, opentelemetry-sdk) are
+# covered by the pins above. The exporter transports via urllib and needs no
+# HTTP client dependency.
+#
+# The exporters are drop-in replacements for the standard proto exporters:
+# they own the public opentelemetry.exporter.otlp.proto.{http,grpc} module
+# paths (shims over the private pure-Python implementations) and register the
+# standard otlp_proto_http / otlp_proto_grpc entry points. This also covers
+# declarative configuration (the SDK's file configurator resolves the
+# otlp_http / otlp_grpc exporter types through exactly those module paths), so
+# the real proto exporters and their google-protobuf C extension must NOT be
+# bundled — the distributions ship conflicting files.
+# The gRPC exporter transports over the pure-Python _pygrpc client (stdlib
+# sockets + ssl, no grpcio C extension), so the whole bundle stays extension-free.
+./vendor/opentelemetry-exporter-otlp-pyproto-http
+./vendor/opentelemetry-exporter-otlp-pyproto-grpc
+./vendor/opentelemetry-exporter-otlp-pyproto-common
+./vendor/opentelemetry-pyproto
+
+opentelemetry-propagator-aws-xray==1.0.2
+
+opentelemetry-instrumentation==0.64b0
+opentelemetry-propagator-ot-trace==0.64b0
+
+opentelemetry-instrumentation-aio-pika==0.64b0
+opentelemetry-instrumentation-aiohttp-client==0.64b0
+opentelemetry-instrumentation-aiohttp-server==0.64b0
+opentelemetry-instrumentation-aiokafka==0.64b0
+opentelemetry-instrumentation-aiopg==0.64b0
+opentelemetry-instrumentation-asgi==0.64b0
+opentelemetry-instrumentation-asyncio==0.64b0
+opentelemetry-instrumentation-asyncpg==0.64b0
+opentelemetry-instrumentation-aws-lambda==0.64b0
+# opentelemetry-instrumentation-boto (legacy boto v2) was removed upstream after
+# 0.61b0; boto3 workloads remain covered by botocore and boto3sqs below.
+opentelemetry-instrumentation-boto3sqs==0.64b0
+opentelemetry-instrumentation-botocore==0.64b0
+opentelemetry-instrumentation-cassandra==0.64b0
+opentelemetry-instrumentation-celery==0.64b0
+opentelemetry-instrumentation-click==0.64b0
+opentelemetry-instrumentation-confluent-kafka==0.64b0
+opentelemetry-instrumentation-dbapi==0.64b0
+opentelemetry-instrumentation-django==0.64b0
+opentelemetry-instrumentation-elasticsearch==0.64b0
+opentelemetry-instrumentation-falcon==0.64b0
+opentelemetry-instrumentation-fastapi==0.64b0
+opentelemetry-instrumentation-flask==0.64b0
+opentelemetry-instrumentation-grpc==0.64b0
+opentelemetry-instrumentation-httpx==0.64b0
+opentelemetry-instrumentation-jinja2==0.64b0
+opentelemetry-instrumentation-kafka-python==0.64b0
+opentelemetry-instrumentation-logging==0.64b0
+opentelemetry-instrumentation-mysql==0.64b0
+opentelemetry-instrumentation-mysqlclient==0.64b0
+opentelemetry-instrumentation-pika==0.64b0
+opentelemetry-instrumentation-psycopg==0.64b0
+opentelemetry-instrumentation-psycopg2==0.64b0
+opentelemetry-instrumentation-pymemcache==0.64b0
+opentelemetry-instrumentation-pymongo==0.64b0
+opentelemetry-instrumentation-pymysql==0.64b0
+opentelemetry-instrumentation-pyramid==0.64b0
+opentelemetry-instrumentation-redis==0.64b0
+opentelemetry-instrumentation-remoulade==0.64b0
+opentelemetry-instrumentation-requests==0.64b0
+opentelemetry-instrumentation-sqlalchemy==0.64b0
+opentelemetry-instrumentation-sqlite3==0.64b0
+opentelemetry-instrumentation-starlette==0.64b0
+opentelemetry-instrumentation-system-metrics==0.64b0
+opentelemetry-instrumentation-threading==0.64b0
+opentelemetry-instrumentation-tornado==0.64b0
+opentelemetry-instrumentation-tortoiseorm==0.64b0
+opentelemetry-instrumentation-urllib==0.64b0
+opentelemetry-instrumentation-urllib3==0.64b0
+opentelemetry-instrumentation-wsgi==0.64b0
