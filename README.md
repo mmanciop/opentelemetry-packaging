@@ -121,6 +121,14 @@ sudo rpm -ivh otelcol_0.156.0_linux_amd64.rpm
 Edit `/etc/otelcol/config.yaml` to keep the `otlp` receiver on `localhost`, matching what the SDKs already talk to, and export outward instead of upstream's default `debug` exporter:
 
 ```yaml
+receivers:
+   otlp:
+     protocols:
+       grpc:
+         endpoint: 127.0.0.1:4317
+       http:
+         endpoint: 127.0.0.1:4318
+
 exporters:
   otlphttp:
     endpoint: https://otlp.example.com
