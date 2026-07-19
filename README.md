@@ -96,7 +96,7 @@ This option is validated by `Test<Language>DeclarativeConfiguration` in `packagi
 
 Leave the auto-instrumentation packages at their defaults — SDKs export OTLP to `localhost:4317` — and install an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) on the same host to receive that traffic and forward it onward.
 This is the arrangement to prefer when several instrumented services on the same host should share one egress point, one set of credentials, and one place to apply processors like batching, retries, resource enrichment, or attribute scrubbing before data leaves the host.
-As collector package, you can install the upstream release directly from the [OpenTelemetry Collector releases](https://github.com/open-telemetry/opentelemetry-collector-releases/releases) page, substituting the version you want below.
+Install the upstream release directly from the [OpenTelemetry Collector releases](https://github.com/open-telemetry/opentelemetry-collector-releases/releases) page, substituting the version below.
 
 On Debian and Ubuntu:
 
