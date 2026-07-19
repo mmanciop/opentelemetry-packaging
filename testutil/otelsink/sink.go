@@ -144,6 +144,17 @@ func (s *Sink) Env() map[string]string {
 	}
 }
 
+// ExternalHTTPEndpoint returns the OTLP/HTTP base URL a container reaches the
+// sink at (host.testcontainers.internal) — the same address Env's
+// OTEL_EXPORTER_OTLP_ENDPOINT points a workload at, exposed here for callers
+// that need it under a different name. Use this to configure a Collector
+// running alongside a workload whose own OTLP exporter must stay pointed
+// elsewhere (e.g. at the Collector itself): passing the sink's address as
+// OTEL_EXPORTER_OTLP_ENDPOINT would leak into the workload's environment too.
+func (s *Sink) ExternalHTTPEndpoint() string {
+	return fmt.Sprintf("http://%s:%d", hostGateway, s.httpPort)
+}
+
 // GRPCEnv is Env for OTLP/gRPC: an insecure (plaintext h2c) gRPC endpoint
 // reachable from inside the container. The http scheme signals insecure to the
 // exporter, matching the sink's plaintext gRPC listener.

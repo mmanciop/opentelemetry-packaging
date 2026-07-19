@@ -36,6 +36,7 @@ packaging/
                                     (python/ also hosts the sitecustomize.py interpreter compatibility tests)
     lifecycle/                      Package lifecycle tests (preload scripts, config handling, install/remove scenarios)
     vendor/                         Vendor replacement tests (plus mkvendor/, the mock acme package builder)
+    collector/                      Collector relay E2E test: injector + Python package at default OTLP settings, plus the upstream Collector relaying off-host
     shared/                         Shared test application sources
 testutil/                    Shared Go test helpers
   otelsink/                  In-process OTLP sink + typed assertion API for E2E tests
@@ -232,6 +233,19 @@ make ARCH=arm64 integration-test-rpm-python
 ```
 
 The Python tests activate the agent through the injector: the package's conf.d drop-in sets `python_auto_instrumentation_agent_path_prefix`, and the injector prepends the agent's `glibc/` directory to `PYTHONPATH` for Python processes.
+
+### Collector relay tests (containers required)
+
+Validates "Option 2" from the top-level README's "Configuring where telemetry goes" section: the Python auto-instrumentation package left at its default OTLP exporter settings, plus the upstream OpenTelemetry Collector relaying telemetry off the host.
+The test image downloads the `otelcol` DEB/RPM directly from its GitHub release, since this project does not (yet) publish its own Collector package.
+
+```sh
+make integration-test-deb-collector
+```
+
+```sh
+make integration-test-rpm-collector
+```
 
 ### Linting
 

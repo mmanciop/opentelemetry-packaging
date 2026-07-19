@@ -1,0 +1,72 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# End-to-end integration test image for "Option 2" in the top-level README's
+# "Configuring where telemetry goes" section: the Python auto-instrumentation
+# package is left at its default OTLP exporter settings (talking to
+# localhost), and a separately installed OpenTelemetry Collector relays
+# telemetry off the container to the otel-sink on the host, standing in for a
+# vendor backend outside the Linux host.
+#
+# Installs the injector and Python agent from a local APT repository, then the
+# upstream "otelcol" DEB directly from its GitHub release — the Packaging SIG
+# does not (yet) publish its own Collector package, so end users combine this
+# project's packages with the upstream Collector release themselves.
+#
+# BASE_IMAGE is a build arg so the same Dockerfile covers multiple apt-based
+# base images. The sink's address reaches the Collector at run time via the
+# OTLP_FORWARD_ENDPOINT environment variable, kept separate from the
+# workload's own (unset, default) OTLP environment so the SDK really does
+# talk to localhost, not to the sink directly.
+
+ARG BASE_IMAGE=debian:12
+FROM ${BASE_IMAGE}
+
+ARG ARCH=amd64
+ARG PYTHON_BIN=python3
+ENV PYTHON_BIN=${PYTHON_BIN}
+
+# Install Python and utilities.
+RUN apt-get update && apt-get install -y \
+    ${PYTHON_BIN} \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pre-built packages and set up a local APT repository.
+COPY build/local-repo/apt /local-repo
+RUN echo 'deb [trusted=yes] file:///local-repo stable main' \
+    > /etc/apt/sources.list.d/opentelemetry-local.list
+
+# Install the injector and Python auto-instrumentation packages from the local repo.
+RUN apt-get update && apt-get install -y \
+    opentelemetry-injector \
+    opentelemetry-python-autoinstrumentation
+
+# Install the upstream OpenTelemetry Collector. The "otelcol" core
+# distribution ships the otlp receiver and the otlp/otlphttp exporters, which
+# is all a relay needs.
+# renovate: datasource=github-releases depName=open-telemetry/opentelemetry-collector-releases
+ARG OTELCOL_VERSION=0.156.0
+ADD https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTELCOL_VERSION}/otelcol_${OTELCOL_VERSION}_linux_${ARCH}.deb /tmp/otelcol.deb
+RUN dpkg -i /tmp/otelcol.deb && rm /tmp/otelcol.deb
+
+# Replace the Collector's default config: keep the OTLP receiver on
+# localhost, unchanged from upstream's shipped default, and forward every
+# signal to OTLP_FORWARD_ENDPOINT instead of upstream's "debug" exporter.
+COPY packaging/tests/collector/otelcol-config.yaml /etc/otelcol/config.yaml
+
+COPY packaging/tests/shared/python/app.py /app/app.py
+COPY packaging/tests/collector/start.sh /start.sh
+
+# The workload's OTLP exporter settings are intentionally left unset (falling
+# back to the SDK default: OTLP/gRPC to localhost:4317) so the SDK talks to
+# the local Collector rather than to a remote endpoint directly.
+ENV OTEL_SERVICE_NAME=python-testapp \
+    OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true \
+    OTEL_BSP_SCHEDULE_DELAY=1000 \
+    OTEL_BLRP_SCHEDULE_DELAY=1000 \
+    OTEL_METRIC_EXPORT_INTERVAL=1000
+
+EXPOSE 8080
+
+CMD ["/bin/bash", "/start.sh"]

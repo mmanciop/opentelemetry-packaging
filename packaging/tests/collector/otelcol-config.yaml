@@ -1,0 +1,39 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# Collector configuration for the "Option 2" integration test (see the
+# top-level README's "Configuring where telemetry goes" section): receives
+# OTLP on localhost, unchanged from upstream's shipped default and exactly
+# where the auto-instrumentation packages' OTLP exporters send to when no
+# endpoint is configured, then relays every signal to OTLP_FORWARD_ENDPOINT —
+# standing in for a vendor backend outside this Linux host.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+exporters:
+  otlphttp:
+    endpoint: ${env:OTLP_FORWARD_ENDPOINT}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp]

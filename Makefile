@@ -269,6 +269,14 @@ integration-test-deb-lifecycle: local-apt-repo local-apt-repo-next
 integration-test-rpm-lifecycle: local-rpm-repo local-rpm-repo-next
 	go test -v -timeout 30m -run 'TestLifecycle/rpm' ./packaging/tests/lifecycle/
 
+.PHONY: integration-test-deb-collector
+integration-test-deb-collector: local-apt-repo
+	go test -v -timeout 30m -run '/deb' ./packaging/tests/collector/
+
+.PHONY: integration-test-rpm-collector
+integration-test-rpm-collector: local-rpm-repo
+	go test -v -timeout 30m -run '/rpm' ./packaging/tests/collector/
+
 .PHONY: integration-test-deb-vendor
 integration-test-deb-vendor: local-apt-repo local-apt-vendor-repo
 	go test -v -timeout 30m -run 'TestVendorReplacement/deb' ./packaging/tests/vendor/

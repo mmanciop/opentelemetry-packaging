@@ -22,6 +22,7 @@ make integration-tests         # Full E2E tests (requires Podman/Docker)
 make integration-test-deb-java # Single E2E test
 make integration-test-deb-lifecycle # Package lifecycle tests (preload, config, install/remove)
 make integration-test-rpm-vendor    # Vendor replacement tests (mock acme package)
+make integration-test-deb-collector # Collector relay E2E (default OTLP exporters + upstream Collector)
 make integration-test-sitecustomize # sitecustomize.py across Python interpreter versions (2.7–3.x)
 
 make lint                      # shellcheck + go vet
@@ -39,6 +40,7 @@ make clean                     # Remove build/
 - `packaging/tests/{java,nodejs,dotnet,python}/` — Testcontainers-based E2E telemetry tests; `python/` also hosts the sitecustomize.py interpreter compatibility tests (unit tests live next to the script)
 - `packaging/tests/lifecycle/` — Package lifecycle tests (preload scripts, config handling, install/remove)
 - `packaging/tests/vendor/` — Vendor replacement tests; `mkvendor/` builds the mock acme package
+- `packaging/tests/collector/` — Collector relay E2E test: injector + Python package at default OTLP settings, plus the upstream Collector relaying off-host
 - `packaging/common/<component>/release.txt` — Renovate-managed upstream version pins (Python pins live in `packaging/common/python/requirements.txt`)
 
 ## Coding conventions

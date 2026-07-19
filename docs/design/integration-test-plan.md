@@ -159,6 +159,20 @@ This proves the whole declarative chain: the shipped file is valid, the `${VAR}`
 Declarative runs assert traces only: under `OTEL_CONFIG_FILE` the SDKs ignore the env-var schedule tuning the images set, so metrics follow the default 60-second cadence.
 The scenarios run inside the `integration-test-deb-<language>` targets.
 
+### 9. Collector relay E2E
+
+Validates "Option 2" from the top-level README's "Configuring where telemetry goes" section: the Python auto-instrumentation package left at its default (unset) OTLP exporter settings, plus a separately installed OpenTelemetry Collector that relays telemetry off the host.
+
+| Test | What it validates |
+|------|-------------------|
+| `TestCollectorRelay` (DEB and RPM, one base image each) | Traces, metrics, and logs reach the sink through the Collector |
+
+The workload container never sets `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_PROTOCOL`, so its OTLP exporter can only reach the Collector's receiver on `localhost` — the workload has no route to the sink except through it.
+The Collector is the upstream `otelcol` core distribution, installed directly from its GitHub release (the Packaging SIG does not yet publish its own Collector package), and its config file (baked into the test image) keeps the `otlp` receiver on `localhost` and forwards every signal via `otlphttp` to `OTLP_FORWARD_ENDPOINT`, an environment variable the Collector's config resolves at startup and the workload's own environment never sees.
+
+**Implementation:** A container starts the Collector as a background process and the Python workload in the foreground (`packaging/tests/collector/start.sh`), waiting for the Collector's OTLP/gRPC receiver to accept connections first.
+Implemented in `packaging/tests/collector/collector_test.go`.
+
 ## Test infrastructure
 
 ### Package metadata and contents tests
@@ -178,6 +192,10 @@ Each scenario runs in a fresh container because every scenario mutates global sy
 
 These need a build step for the mock `acme-*` package (`packaging/tests/vendor/mkvendor`), then use the same lifecycle container pattern.
 
+### Collector relay tests
+
+These need the upstream `otelcol` DEB/RPM, downloaded from its GitHub release during the image build — the only test image in the suite that reaches outside the local repo.
+
 ## Makefile targets
 
 ```
@@ -195,6 +213,8 @@ make integration-test-deb-lifecycle       # DEB install/remove/upgrade/config
 make integration-test-rpm-lifecycle       # RPM install/remove/upgrade/config
 make integration-test-deb-vendor          # DEB vendor replacement
 make integration-test-rpm-vendor          # RPM vendor replacement
+make integration-test-deb-collector       # DEB Collector relay E2E
+make integration-test-rpm-collector       # RPM Collector relay E2E
 ```
 
 The lifecycle targets cover categories 3, 4, and 5 in `packaging/tests/lifecycle/`.
