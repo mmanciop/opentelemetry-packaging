@@ -53,9 +53,8 @@ sudo dnf install opentelemetry
 
 ## Configuring where telemetry goes
 
-By default, every auto-instrumentation package exports OTLP to `localhost`, which is unreachable from outside the host.
+By default, every auto-instrumentation package exports OTLP to `localhost`.
 Point it at a real destination with one of the two options below.
-Both are validated end to end by the integration test suite in `packaging/tests/` (see the last paragraph of each option).
 
 ### Option 1: Declarative SDK configuration file
 
@@ -96,8 +95,8 @@ This option is validated by `Test<Language>DeclarativeConfiguration` in `packagi
 ### Option 2: A local Collector
 
 Leave the auto-instrumentation packages at their defaults — SDKs export OTLP to `localhost:4317` — and install an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) on the same host to receive that traffic and forward it onward.
-This is the arrangement to prefer when several instrumented services on the same host should share one egress point, one set of credentials, and one place to apply processors like batching, retries, or attribute scrubbing before data leaves the host.
-The Packaging SIG does not yet publish its own Collector package (see "Infrastructure and packaging" below), so install the upstream release directly from its [releases page](https://github.com/open-telemetry/opentelemetry-collector-releases/releases), substituting the version you want below.
+This is the arrangement to prefer when several instrumented services on the same host should share one egress point, one set of credentials, and one place to apply processors like batching, retries, resource enrichment, or attribute scrubbing before data leaves the host.
+As collector package, you can install the upstream release directly from the [OpenTelemetry Collector releases](https://github.com/open-telemetry/opentelemetry-collector-releases/releases) page, substituting the version you want below.
 
 On Debian and Ubuntu:
 
@@ -146,8 +145,6 @@ Restart the service for the new configuration to take effect:
 ```sh
 sudo systemctl restart otelcol
 ```
-
-This option is validated by `TestCollectorRelay` in `packaging/tests/collector/`, which installs the injector, the Python auto-instrumentation package, and the upstream Collector side by side, and asserts telemetry reaches a test sink — reachable only through the Collector, since the workload's OTLP exporter is left pointed at `localhost`.
 
 ## Current scope
 
