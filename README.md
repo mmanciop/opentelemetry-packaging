@@ -1,5 +1,86 @@
 # OpenTelemetry Packaging
 
+The Packaging SIG delivers a streamlined, product-like experience for monitoring applications on virtual Linux hosts.
+It combines the [OpenTelemetry Injector](https://github.com/open-telemetry/opentelemetry-go-instrumentation/tree/main/internal/pkg/inject), [OpenTelemetry eBPF Instrumentation (OBI)](https://github.com/open-telemetry/opentelemetry-go-instrumentation), and the [OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector) into modular system packages.
+Users can achieve observability through a single command:
+
+```sh
+{apt|yum} install opentelemetry
+```
+
+## Installing
+
+Each release publishes APT and YUM repositories on [GitHub Pages](https://open-telemetry.github.io/opentelemetry-packaging/), together with a landing page that carries the complete installation instructions, including selective per-language installs.
+
+> [!NOTE]
+> The GitHub Pages hosting is an interim solution, and the repository URLs below will change when the packages move to their permanent distribution infrastructure.
+
+On Debian and Ubuntu, add the APT repository:
+
+```sh
+echo "deb [trusted=yes] https://open-telemetry.github.io/opentelemetry-packaging/debian stable main" | sudo tee /etc/apt/sources.list.d/opentelemetry.list
+```
+
+Refresh the package index:
+
+```sh
+sudo apt update
+```
+
+Install the full auto-instrumentation suite:
+
+```sh
+sudo apt install opentelemetry
+```
+
+On Fedora, RHEL, and derivatives, add the YUM repository:
+
+```sh
+cat <<EOF | sudo tee /etc/yum.repos.d/opentelemetry.repo
+[opentelemetry]
+name=OpenTelemetry Auto-Instrumentation System Packages
+baseurl=https://open-telemetry.github.io/opentelemetry-packaging/rpm/packages
+enabled=1
+gpgcheck=0
+EOF
+```
+
+Install the full auto-instrumentation suite:
+
+```sh
+sudo dnf install opentelemetry
+```
+
+## Current scope
+
+Scope as defined by the approved [System Packages](https://github.com/open-telemetry/community/blob/main/projects/packaging.md) project.
+
+### Infrastructure and packaging
+
+- Establish APT and RPM repository infrastructure for OpenTelemetry packages
+- Publish modular system packages for the Injector, OBI, and language-specific auto-instrumentation (Java, .NET, Node.js, Python)
+- Integrate existing OpenTelemetry Collector packages into repositories
+- Define versioning policies aligned with Debian, Ubuntu, and Red Hat practices
+
+### Design principles
+
+- Make declarative configuration a foundational element.
+- Enable vendor packages to provide alternatives to upstream offerings.
+- Ensure OBI and the Injector operate cohesively without double instrumentation.
+- Adhere to Filesystem Hierarchy Standard (FHS) and packaging best practices.
+
+### Out of scope
+
+- Operating systems beyond Debian and RHEL derivatives.
+- Profilers integration.
+- Container image building.
+
+## Contributing
+
+For more details on the project proposal, see the [community project page](https://github.com/open-telemetry/community/blob/main/projects/packaging.md).
+
+[SIG meetings](https://www.google.com/url?q=https://zoom.us/j/93361845299?pwd%3DahGkKCqKCBxKtbWDlALJwcwqZo3GBX.1&sa=D&source=calendar&ust=1779485312363010&usg=AOvVaw0_s1RG9qCfUqT1yNjqgzWj) ([minutes](https://docs.google.com/document/d/1NDY0rpntHeyEvx9xUg9WdiNyWa7Gq8YKUdjfM1a36GI)) are held weekly on Wednesdays at 10 AM PT.
+
 ## Maintainers
 
 - [Antoine Toulme](https://github.com/atoulme), [Splunk](https://www.splunk.com/)

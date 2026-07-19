@@ -1,0 +1,59 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+# End-to-end integration test image for the Python auto-instrumentation DEB
+# package, on an apt-based base image. Installs the injector and Python agent
+# from a local APT repository, then runs a minimal HTTP server that issues
+# sqlite3 queries and emits a log record. The injector activates the agent by
+# prepending /usr/lib/opentelemetry/python/glibc to PYTHONPATH for Python
+# processes; the agent exports OTLP over HTTP to the otel-sink on the host, and
+# the Go test drives traffic and asserts on the exported telemetry.
+#
+# BASE_IMAGE and PYTHON_BIN are build args so the same Dockerfile covers multiple
+# apt-based base images (e.g. debian:12, which ships Python 3.11 to match the
+# bundled cp311 wheels). The OTLP endpoint and per-test test.id come from the
+# sink's Env at run time.
+
+ARG BASE_IMAGE=debian:12
+FROM ${BASE_IMAGE}
+
+ARG ARCH=amd64
+ARG PYTHON_BIN=python3
+ENV PYTHON_BIN=${PYTHON_BIN}
+
+# Install Python and utilities.
+RUN apt-get update && apt-get install -y \
+    ${PYTHON_BIN} \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy pre-built packages and set up a local APT repository.
+COPY build/local-repo/apt /local-repo
+RUN echo 'deb [trusted=yes] file:///local-repo stable main' \
+    > /etc/apt/sources.list.d/opentelemetry-local.list
+
+# Install the injector and Python auto-instrumentation packages from the local repo.
+RUN apt-get update && apt-get install -y \
+    opentelemetry-injector \
+    opentelemetry-python-autoinstrumentation
+
+# Copy the test server.
+COPY packaging/tests/shared/python/app.py /app/app.py
+
+# The injector activates the agent (it prepends the agent's glibc directory to
+# PYTHONPATH for Python processes). The exporter is intentionally left unset:
+# sitecustomize.py defaults all signals to the bundled pure-Python exporter
+# (otlp_proto_http); OTEL_EXPORTER_OTLP_PROTOCOL is set to http/protobuf by the
+# sink's Env. Shortened schedule delays get telemetry to the sink within the test
+# window, and log auto-instrumentation exports stdlib logging records as OTLP logs.
+ENV OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true \
+    OTEL_SERVICE_NAME=python-testapp \
+    OTEL_BSP_SCHEDULE_DELAY=1000 \
+    OTEL_BLRP_SCHEDULE_DELAY=1000 \
+    OTEL_METRIC_EXPORT_INTERVAL=1000 \
+    OTEL_INJECTOR_LOG_LEVEL=debug
+
+EXPOSE 8080
+
+# Tee stdout/stderr to a file so container output is available for debugging.
+CMD ["/bin/sh", "-c", "$PYTHON_BIN /app/app.py 2>&1 | tee /tmp/app-output.log"]
