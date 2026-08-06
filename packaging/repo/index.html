@@ -51,6 +51,14 @@
     h2 { margin-top: 2rem; }
     a { color: var(--link-color); }
     .version { color: #666; font-size: 0.9em; }
+    .note {
+      background: var(--code-bg);
+      border-left: 4px solid var(--link-color);
+      padding: 0.75rem 1rem;
+      border-radius: 4px;
+      margin: 1.5rem 0;
+    }
+    .note p { margin: 0.5rem 0; }
     ul { padding-left: 1.5rem; }
     li { margin: 0.5rem 0; }
   </style>
@@ -59,6 +67,13 @@
   <h1>OpenTelemetry System Packages</h1>
   <p class="version">Current version: <strong>@VERSION@</strong></p>
   <p>Linux packages for automatic instrumentation of Java, Node.js, .NET, and Python applications using OpenTelemetry.</p>
+
+  <div class="note">
+    <p><strong>This repository is an experiment, and it keeps only the latest version.</strong></p>
+    <p>Hosting on GitHub Pages exists to exercise the package system and its metadata.
+    Publishing a release replaces the packages that came before it, so superseded versions stop being resolvable through <code>apt</code> or <code>dnf</code>.
+    See <a href="#version-retention">Version Retention</a> before you pin a version.</p>
+  </div>
 
   <h2>Quick Install (Debian/Ubuntu)</h2>
   <pre><code># Add the repository
@@ -104,6 +119,28 @@ sudo apt install opentelemetry-injector opentelemetry-dotnet-autoinstrumentation
 
 # Install only Python instrumentation
 sudo apt install opentelemetry-injector opentelemetry-python-autoinstrumentation</code></pre>
+
+  <h2 id="version-retention">Version Retention</h2>
+  <p>This repository carries only the latest version of each package, currently <strong>@VERSION@</strong>.
+  Each release replaces the packages that preceded it, so a superseded version is no longer available from the APT or YUM repository.
+  Pinning a package to an exact version holds only for as long as that version is the latest one: an install that pins an older version starts failing as soon as the next release is published.</p>
+
+  <p>This is a deliberate property of the interim GitHub Pages hosting, which exists to exercise the package system and its metadata rather than to serve as a package archive.
+  The policy will change when the packages move to dedicated repository infrastructure;
+  <a href="https://github.com/open-telemetry/opentelemetry-packaging/issues/65">issue #65</a> tracks that discussion.</p>
+
+  <p>Every version stays available outside this repository.
+  Each release attaches its <code>.deb</code> and <code>.rpm</code> files as assets on the
+  <a href="https://github.com/open-telemetry/opentelemetry-packaging/releases">releases page</a>, so you can download a specific version and install it directly:</p>
+
+  <p>On Debian and Ubuntu:</p>
+  <pre><code>sudo dpkg -i opentelemetry-injector_&lt;version&gt;_amd64.deb</code></pre>
+
+  <p>On RHEL, Fedora, and Amazon Linux:</p>
+  <pre><code>sudo rpm -ivh opentelemetry-injector-&lt;version&gt;-1.x86_64.rpm</code></pre>
+
+  <p>A package installed that way is still upgraded on the next <code>apt upgrade</code> or <code>dnf upgrade</code>.
+  Hold it explicitly with <code>apt-mark hold</code> or <code>dnf versionlock</code> if the version has to stay put.</p>
 
   <h2>Links</h2>
   <ul>
