@@ -21,6 +21,11 @@ Publishing the release triggers the [Publish Package Repositories workflow](.git
 3. Renders the landing page from `packaging/repo/index.html`, substituting the release tag and the repository URL.
 4. Deploys the result to the `gh-pages` branch.
 
+Step 4 deploys with `force_orphan`, and the repository metadata is generated from the assets of a single release, so each publish replaces the previous one entirely.
+The published APT and YUM repositories therefore only ever offer the latest version of each package, which is the retention policy documented in the [README](README.md#version-retention) and on the landing page.
+Superseded versions remain available as release assets, so nothing is lost, but consumers cannot resolve them through `apt` or `dnf`.
+This expectation holds for as long as the packages are hosted on GitHub Pages; the policy is expected to change when they move to dedicated repository infrastructure, which [issue #65](https://github.com/open-telemetry/opentelemetry-packaging/issues/65) tracks.
+
 The workflow can also be dispatched manually with an existing release tag, to re-publish the repositories without cutting a new release.
 
 ```sh

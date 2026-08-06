@@ -12,8 +12,10 @@ Users can achieve observability through a single command:
 
 Each release publishes APT and YUM repositories on [GitHub Pages](https://open-telemetry.github.io/opentelemetry-packaging/), together with a landing page that carries the complete installation instructions, including selective per-language installs.
 
-> [!NOTE]
-> The GitHub Pages hosting is an interim solution, and the repository URLs below will change when the packages move to their permanent distribution infrastructure.
+> [!IMPORTANT]
+> The GitHub Pages hosting is an interim solution that exists to experiment with the package system and its metadata.
+> It keeps only the latest version of each package, and the repository URLs below will change when the packages move to their permanent distribution infrastructure.
+> Read [version retention](#version-retention) before you pin a version.
 
 On Debian and Ubuntu, add the APT repository:
 
@@ -50,6 +52,31 @@ Install the full auto-instrumentation suite:
 ```sh
 sudo dnf install opentelemetry
 ```
+
+### Version retention
+
+The APT and YUM repositories carry only the latest version of each package.
+Publishing a release replaces the packages that came before it, so a superseded version stops being resolvable through `apt` or `dnf`.
+Pinning a package to an exact version therefore holds only for as long as that version is the latest one, and an install that pins an older version starts failing as soon as the next release is published.
+
+This is a deliberate property of the interim hosting rather than an oversight.
+The GitHub Pages repository is there to exercise the package system and its metadata, not to serve as a package archive.
+The policy will change when the packages move to dedicated repository infrastructure, and [issue #65](https://github.com/open-telemetry/opentelemetry-packaging/issues/65) stays open to track that discussion.
+
+Until then, every version remains available outside the repositories: each release attaches its `.deb` and `.rpm` files as assets on the [releases page](https://github.com/open-telemetry/opentelemetry-packaging/releases).
+Download the asset for the version you need and install it directly, for example on Debian and Ubuntu:
+
+```sh
+sudo dpkg -i opentelemetry-injector_<version>_amd64.deb
+```
+
+On Fedora, RHEL, and derivatives:
+
+```sh
+sudo rpm -ivh opentelemetry-injector-<version>-1.x86_64.rpm
+```
+
+A package installed this way is still upgraded to the latest version on the next `apt upgrade` or `dnf upgrade`, so hold it explicitly with `apt-mark hold` or `dnf versionlock` if the version has to stay put.
 
 ## Configuring where telemetry goes
 
