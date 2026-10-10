@@ -3,17 +3,19 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-# Keep the sitecustomize.py version gate in sync with the strictest
-# Requires-Python across the distributions that actually ship.
+# Keep supportedPythonVersions in packaging/builder/download.go in sync with
+# the strictest Requires-Python across the distributions that actually ship.
 #
 # Usage: check-minimum-python-version.sh [--check|--write]
 #
-#   --check (the default) fails when the gate differs from the derived floor.
-#   --write rewrites the gate to the derived floor.
+#   --check (the default) fails when a listed version is below the derived
+#   floor.
+#   --write drops the listed versions below the derived floor.
 #
 # Environment:
 #
-#   MINIMUM_PYTHON  Interpreter that derives the floor (default: python3.10).
+#   MINIMUM_PYTHON  Interpreter that derives the floor (default: the lowest
+#                   version in supportedPythonVersions, as pythonX.Y).
 #   BUILD_DIR       Scratch directory for the venv and the payload
 #                   (default: build/ at the repository root, removed by
 #                   "make clean").
@@ -30,11 +32,11 @@
 # The vendored floor is read straight from each vendor pyproject.toml via
 # --vendor-dir, so the vendored source does not need to be built for the check.
 #
-# The venv that runs the tool is built with the minimum supported interpreter
-# (MINIMUM_PYTHON, the current 3.x floor) on purpose: its pip must resolve the
-# payload's transitive dependencies the way it would on that floor, so a newer
-# release of a transitive dependency that raised its own Requires-Python does
-# not inflate the derived floor above what actually runs on the minimum
+# The venv that runs the tool is built with the lowest interpreter in
+# supportedPythonVersions on purpose: its pip must resolve the payload's
+# transitive dependencies the way it would on that version, so a newer release
+# of a transitive dependency that raised its own Requires-Python does not
+# inflate the derived floor above what actually runs on the lowest supported
 # interpreter. tomli is the tomllib backport the tool falls back to under
 # Python 3.10 (tomllib is standard library from 3.11).
 
@@ -51,7 +53,17 @@ esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PYTHON_DIR="${REPO_ROOT}/packaging/common/python"
-MINIMUM_PYTHON="${MINIMUM_PYTHON:-python3.10}"
+DOWNLOAD_GO="${REPO_ROOT}/packaging/builder/download.go"
+
+MINIMUM_PYTHON_VERSION="$(
+    grep '^var supportedPythonVersions' "${DOWNLOAD_GO}" \
+        | grep -o '"[0-9]\{1,\}\.[0-9]\{1,\}"' | tr -d '"' | sort -V | head -1
+)"
+if [ -z "${MINIMUM_PYTHON_VERSION}" ]; then
+    echo "error: could not read supportedPythonVersions from ${DOWNLOAD_GO}" >&2
+    exit 1
+fi
+MINIMUM_PYTHON="${MINIMUM_PYTHON:-python${MINIMUM_PYTHON_VERSION}}"
 BUILD_DIR="${BUILD_DIR:-${REPO_ROOT}/build}"
 VENV_DIR="${BUILD_DIR}/minimum-python-version-venv"
 PAYLOAD_DIR="${BUILD_DIR}/minimum-python-version-payload"
@@ -76,4 +88,4 @@ grep -v '^\./vendor/' "${PYTHON_DIR}/requirements.txt" \
     "${MODE}" \
     --payload-dir "${PAYLOAD_DIR}" \
     --vendor-dir "${PYTHON_DIR}/vendor" \
-    --sitecustomize "${PYTHON_DIR}/sitecustomize.py"
+    --download-go "${DOWNLOAD_GO}"
