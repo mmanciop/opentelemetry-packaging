@@ -76,7 +76,7 @@ if ! command -v "${MINIMUM_PYTHON}" > /dev/null 2>&1; then
     exit 1
 fi
 
-"${MINIMUM_PYTHON}" -m venv "${VENV_DIR}"
+"${MINIMUM_PYTHON}" -m venv --clear "${VENV_DIR}"
 "${VENV_DIR}/bin/pip" install --quiet packaging tomli
 
 rm -rf "${PAYLOAD_DIR}"
