@@ -11,17 +11,23 @@ from unittest import TestCase
 
 from sync_minimum_python_version import (
     lowest_supported_major_minor_across_requires_python,
-    read_gate_minor_from_sitecustomize,
-    rewrite_gate_minor_in_sitecustomize,
+    prune_supported_versions,
+    read_supported_versions,
 )
 
 _TOOL_PATH = str(Path(__file__).with_name("sync_minimum_python_version.py"))
 
-_MINIMAL_SITECUSTOMIZE = (
-    "# Require Python >= 3.10. This floor is the strictest.\n"
-    "_MINIMUM_PYTHON_MINOR = 10  # sync-minimum-python-version: 3.x minor floor\n"
-    "if version_info[0] != 3 or version_info[1] < _MINIMUM_PYTHON_MINOR:\n"
-    "    pass\n"
+_SUPPORTED_VERSIONS_DECLARATION = (
+    'var supportedPythonVersions = []string{"3.10", "3.11", "3.12", "3.13"}')
+
+_MINIMAL_DOWNLOAD_GO = (
+    "package builder\n"
+    "\n"
+    + _SUPPORTED_VERSIONS_DECLARATION + "\n"
+    "\n"
+    "func pythonABITag(pythonVersion string) string {\n"
+    '\treturn "cp" + strings.ReplaceAll(pythonVersion, ".", "")\n'
+    "}\n"
 )
 
 
@@ -44,24 +50,25 @@ def write_dist_info_with_requires_python(
         encoding="utf-8")
 
 
-def write_sitecustomize_with_gate_minor(sitecustomize_path, gate_minor):
-    """Write a minimal sitecustomize.py whose gate constant holds gate_minor."""
-    sitecustomize_path.write_text(
-        _MINIMAL_SITECUSTOMIZE.replace(
-            "= 10  #", "= {}  #".format(gate_minor)).replace(
-            ">= 3.10", ">= 3.{}".format(gate_minor)),
+def write_download_go_with_versions(download_go_path, versions):
+    """Write a minimal download.go listing the given "major.minor" strings."""
+    declaration = "var supportedPythonVersions = []string{{{}}}".format(
+        ", ".join('"{}"'.format(version) for version in versions))
+    download_go_path.write_text(
+        _MINIMAL_DOWNLOAD_GO.replace(
+            _SUPPORTED_VERSIONS_DECLARATION, declaration),
         encoding="utf-8")
 
 
 def run_sync_minimum_python_version(
-        mode, payload_directory, vendor_directory, sitecustomize_path):
+        mode, payload_directory, vendor_directory, download_go_path):
     """Run the tool in --check or --write mode and return the completed run."""
     return run(
         [
             executable, _TOOL_PATH, mode,
             "--payload-dir", str(payload_directory),
             "--vendor-dir", str(vendor_directory),
-            "--sitecustomize", str(sitecustomize_path),
+            "--download-go", str(download_go_path),
         ],
         capture_output=True, text=True)
 
@@ -71,8 +78,8 @@ class TestDeriveFloorFromRequiresPython(TestCase):
     def test_strictest_lower_bound_wins(self):
         self.assertEqual(
             lowest_supported_major_minor_across_requires_python(
-                [">=3.9", ">=3.10", ">=3.8,<4"]),
-            (3, 10))
+                [">=3.8", ">=3.11", ">=3.9"]),
+            (3, 11))
 
     def test_compatible_release_specifier_resolves_to_its_minor(self):
         self.assertEqual(
@@ -82,24 +89,24 @@ class TestDeriveFloorFromRequiresPython(TestCase):
     def test_empty_and_none_specifiers_are_ignored(self):
         self.assertEqual(
             lowest_supported_major_minor_across_requires_python(
-                [None, "", ">=3.12"]),
-            (3, 12))
+                ["", None, ">=3.10"]),
+            (3, 10))
 
     def test_no_specifiers_yields_none(self):
         self.assertIsNone(
-            lowest_supported_major_minor_across_requires_python([None, ""]))
+            lowest_supported_major_minor_across_requires_python(["", None]))
 
 
 class TestPayloadScopedEnumeration(TestCase):
 
     def test_floor_comes_only_from_the_payload_directory(self):
         # The payload declares a single distribution at >=3.7, so the floor is
-        # 3.7 and a gate of 7 is in sync. The interpreter running this test has
-        # packaging installed (>=3.9), plus pip and setuptools from the
-        # throwaway venv the python-unit-tests target builds. An enumeration
-        # that walked sys.path instead of --payload-dir would derive at least
-        # 3.9 from those and report the gate as out of sync, so passing here is
-        # what proves the enumeration is scoped to the payload.
+        # 3.7. The interpreter running this test has packaging installed
+        # (>=3.9), plus pip and setuptools from the throwaway venv the
+        # python-unit-tests target builds. An enumeration that walked sys.path
+        # instead of --payload-dir would derive at least 3.9 from those, so
+        # seeing 3.7 reported is what proves the enumeration is scoped to the
+        # payload.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -107,12 +114,12 @@ class TestPayloadScopedEnumeration(TestCase):
                 payload_directory, "shipped_thing", "1.0", ">=3.7")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            sitecustomize_path = temporary_path / "sitecustomize.py"
-            write_sitecustomize_with_gate_minor(sitecustomize_path, 7)
+            download_go_path = temporary_path / "download.go"
+            write_download_go_with_versions(download_go_path, ["3.7", "3.8"])
 
             completed = run_sync_minimum_python_version(
                 "--check", payload_directory, vendor_directory,
-                sitecustomize_path)
+                download_go_path)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("derived minimum Python: 3.7", completed.stdout)
@@ -127,12 +134,12 @@ class TestPayloadScopedEnumeration(TestCase):
                 payload_directory, "strict_thing", "2.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            sitecustomize_path = temporary_path / "sitecustomize.py"
-            write_sitecustomize_with_gate_minor(sitecustomize_path, 11)
+            download_go_path = temporary_path / "download.go"
+            write_download_go_with_versions(download_go_path, ["3.11", "3.12"])
 
             completed = run_sync_minimum_python_version(
                 "--check", payload_directory, vendor_directory,
-                sitecustomize_path)
+                download_go_path)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("derived minimum Python: 3.11", completed.stdout)
@@ -150,12 +157,12 @@ class TestPayloadScopedEnumeration(TestCase):
                 'name = "some-package"\n'
                 'requires-python = ">=3.10"\n',
                 encoding="utf-8")
-            sitecustomize_path = temporary_path / "sitecustomize.py"
-            write_sitecustomize_with_gate_minor(sitecustomize_path, 10)
+            download_go_path = temporary_path / "download.go"
+            write_download_go_with_versions(download_go_path, ["3.10"])
 
             completed = run_sync_minimum_python_version(
                 "--check", temporary_path / "no-such-payload",
-                temporary_path / "vendor", sitecustomize_path)
+                temporary_path / "vendor", download_go_path)
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("no distributions found", completed.stderr)
@@ -167,12 +174,12 @@ class TestPayloadScopedEnumeration(TestCase):
             payload_directory.mkdir()
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            sitecustomize_path = temporary_path / "sitecustomize.py"
-            write_sitecustomize_with_gate_minor(sitecustomize_path, 10)
+            download_go_path = temporary_path / "download.go"
+            write_download_go_with_versions(download_go_path, ["3.10"])
 
             completed = run_sync_minimum_python_version(
                 "--check", payload_directory, vendor_directory,
-                sitecustomize_path)
+                download_go_path)
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("no distributions found", completed.stderr)
@@ -182,9 +189,10 @@ class TestVendorPyprojectParsing(TestCase):
 
     def test_check_reads_requires_python_from_vendor_pyproject(self):
         # The payload floor (3.8) is below the only vendored pyproject floor
-        # (3.12), which must therefore drive --check to report the gate (3.10)
-        # as out of sync. This proves the tool reads [project].requires-python
-        # from pyproject.toml files found under --vendor-dir.
+        # (3.12), which must therefore drive --check to reject a list that
+        # still starts at 3.10. This proves the tool reads
+        # [project].requires-python from pyproject.toml files under
+        # --vendor-dir.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -197,49 +205,65 @@ class TestVendorPyprojectParsing(TestCase):
                 'name = "some-package"\n'
                 'requires-python = ">=3.12"\n',
                 encoding="utf-8")
-            sitecustomize_path = temporary_path / "sitecustomize.py"
-            sitecustomize_path.write_text(
-                _MINIMAL_SITECUSTOMIZE, encoding="utf-8")
+            download_go_path = temporary_path / "download.go"
+            write_download_go_with_versions(
+                download_go_path, ["3.10", "3.11", "3.12"])
 
             completed = run_sync_minimum_python_version(
                 "--check", payload_directory, temporary_path / "vendor",
-                sitecustomize_path)
+                download_go_path)
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("3.12", completed.stdout)
 
 
-class TestGateConstantReadAndRewrite(TestCase):
+class TestSupportedVersionsReadAndPrune(TestCase):
 
-    def test_read_gate_minor_from_marker_line(self):
+    def test_read_versions_from_the_declaration(self):
         self.assertEqual(
-            read_gate_minor_from_sitecustomize(_MINIMAL_SITECUSTOMIZE), 10)
+            read_supported_versions(_MINIMAL_DOWNLOAD_GO),
+            [(3, 10), (3, 11), (3, 12), (3, 13)])
 
-    def test_read_gate_minor_without_marker_raises(self):
+    def test_read_without_the_declaration_raises(self):
         with self.assertRaises(ValueError):
-            read_gate_minor_from_sitecustomize("no marker here\n")
+            read_supported_versions("package builder\n")
 
-    def test_rewrite_updates_constant_and_human_readable_comment(self):
-        rewritten = rewrite_gate_minor_in_sitecustomize(
-            _MINIMAL_SITECUSTOMIZE, 12)
+    def test_read_with_two_declarations_raises(self):
+        with self.assertRaises(ValueError):
+            read_supported_versions(
+                _MINIMAL_DOWNLOAD_GO + _MINIMAL_DOWNLOAD_GO)
+
+    def test_read_with_an_empty_list_raises(self):
+        with self.assertRaises(ValueError):
+            read_supported_versions(
+                "var supportedPythonVersions = []string{}\n")
+
+    def test_prune_drops_only_the_versions_below_the_floor(self):
+        pruned = prune_supported_versions(_MINIMAL_DOWNLOAD_GO, (3, 12))
         self.assertIn(
-            "_MINIMUM_PYTHON_MINOR = 12  # sync-minimum-python-version",
-            rewritten)
-        self.assertIn("# Require Python >= 3.12", rewritten)
-        self.assertNotIn("3.10", rewritten)
-        self.assertEqual(read_gate_minor_from_sitecustomize(rewritten), 12)
+            'var supportedPythonVersions = []string{"3.12", "3.13"}', pruned)
+        self.assertEqual(read_supported_versions(pruned), [(3, 12), (3, 13)])
 
-    def test_rewrite_requires_exactly_one_marker(self):
+    def test_prune_leaves_the_rest_of_the_file_untouched(self):
+        pruned = prune_supported_versions(_MINIMAL_DOWNLOAD_GO, (3, 12))
+        self.assertTrue(pruned.startswith("package builder\n"))
+        self.assertIn(
+            "func pythonABITag(pythonVersion string) string {", pruned)
+
+    def test_prune_below_every_version_changes_nothing(self):
+        self.assertEqual(
+            read_supported_versions(
+                prune_supported_versions(_MINIMAL_DOWNLOAD_GO, (3, 9))),
+            [(3, 10), (3, 11), (3, 12), (3, 13)])
+
+    def test_prune_that_would_empty_the_list_raises(self):
         with self.assertRaises(ValueError):
-            rewrite_gate_minor_in_sitecustomize("no marker here\n", 12)
+            prune_supported_versions(_MINIMAL_DOWNLOAD_GO, (3, 99))
 
 
 class TestCheckAndWriteEndToEnd(TestCase):
 
-    def test_check_exits_zero_when_gate_matches_and_nonzero_when_not(self):
-        # A payload whose strictest distribution declares >=3.11 fixes the
-        # derived floor at 3.11, so a gate of 11 must pass and a gate of 12
-        # must fail.
+    def test_check_passes_when_every_version_meets_the_floor(self):
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -247,27 +271,65 @@ class TestCheckAndWriteEndToEnd(TestCase):
                 payload_directory, "shipped_thing", "1.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
+            download_go_path = temporary_path / "download.go"
+            write_download_go_with_versions(download_go_path, ["3.11", "3.12"])
 
-            matching_sitecustomize = temporary_path / "matching.py"
-            write_sitecustomize_with_gate_minor(matching_sitecustomize, 11)
-            matching = run_sync_minimum_python_version(
+            completed = run_sync_minimum_python_version(
                 "--check", payload_directory, vendor_directory,
-                matching_sitecustomize)
-            self.assertEqual(matching.returncode, 0, matching.stderr)
+                download_go_path)
 
-            mismatching_sitecustomize = temporary_path / "mismatching.py"
-            write_sitecustomize_with_gate_minor(mismatching_sitecustomize, 12)
-            mismatching = run_sync_minimum_python_version(
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("is in sync", completed.stdout)
+
+    def test_check_fails_when_a_version_is_below_the_floor(self):
+        # This is the regression the check exists for: a dependency bump
+        # raises the floor to 3.11 while the builder still tries to resolve
+        # the payload for 3.10, which pip cannot do.
+        with TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            payload_directory = temporary_path / "payload"
+            write_dist_info_with_requires_python(
+                payload_directory, "shipped_thing", "1.0", ">=3.11")
+            vendor_directory = temporary_path / "vendor"
+            vendor_directory.mkdir()
+            download_go_path = temporary_path / "download.go"
+            write_download_go_with_versions(
+                download_go_path, ["3.10", "3.11", "3.12"])
+
+            completed = run_sync_minimum_python_version(
                 "--check", payload_directory, vendor_directory,
-                mismatching_sitecustomize)
+                download_go_path)
 
-        self.assertNotEqual(mismatching.returncode, 0)
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("3.10", completed.stderr)
 
-    def test_write_rewrites_marker_and_comment_to_derived_floor(self):
-        # A vendored pyproject with a 3.13 floor above the payload's 3.10 puts
-        # the derived floor at 3.13. --write must rewrite the temp
-        # sitecustomize to that minor in both the constant and the
-        # human-readable comment.
+    def test_check_passes_with_a_note_when_the_floor_is_below_every_version(
+            self):
+        # Shipping fewer interpreters than the dependencies permit is a
+        # deliberate choice, because wheel availability rather than
+        # Requires-Python governs the top of the list, so this reports rather
+        # than fails.
+        with TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            payload_directory = temporary_path / "payload"
+            write_dist_info_with_requires_python(
+                payload_directory, "shipped_thing", "1.0", ">=3.8")
+            vendor_directory = temporary_path / "vendor"
+            vendor_directory.mkdir()
+            download_go_path = temporary_path / "download.go"
+            write_download_go_with_versions(download_go_path, ["3.10", "3.11"])
+
+            completed = run_sync_minimum_python_version(
+                "--check", payload_directory, vendor_directory,
+                download_go_path)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("would also permit 3.8", completed.stdout)
+
+    def test_write_drops_the_versions_below_the_derived_floor(self):
+        # A vendored pyproject with a 3.12 floor above the payload's 3.10 puts
+        # the derived floor at 3.12, so --write must drop 3.10 and 3.11 and
+        # keep the rest.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -278,19 +340,19 @@ class TestCheckAndWriteEndToEnd(TestCase):
             (vendor_directory / "pyproject.toml").write_text(
                 "[project]\n"
                 'name = "high-floor"\n'
-                'requires-python = ">=3.13"\n',
+                'requires-python = ">=3.12"\n',
                 encoding="utf-8")
-            sitecustomize_path = temporary_path / "sitecustomize.py"
-            sitecustomize_path.write_text(
-                _MINIMAL_SITECUSTOMIZE, encoding="utf-8")
+            download_go_path = temporary_path / "download.go"
+            download_go_path.write_text(
+                _MINIMAL_DOWNLOAD_GO, encoding="utf-8")
 
             completed = run_sync_minimum_python_version(
                 "--write", payload_directory, temporary_path / "vendor",
-                sitecustomize_path)
+                download_go_path)
             self.assertEqual(completed.returncode, 0, completed.stderr)
 
-            rewritten = sitecustomize_path.read_text(encoding="utf-8")
-            self.assertIn(
-                "_MINIMUM_PYTHON_MINOR = 13  # sync-minimum-python-version",
-                rewritten)
-            self.assertIn("# Require Python >= 3.13", rewritten)
+            rewritten = download_go_path.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'var supportedPythonVersions = []string{"3.12", "3.13"}',
+            rewritten)

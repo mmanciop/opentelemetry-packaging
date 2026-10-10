@@ -1,13 +1,29 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Derive and enforce the sitecustomize.py minimum Python version.
+"""Derive and enforce the minimum Python version the package is built for.
 
 The minimum supported Python of the bundled agent is the strictest
 Requires-Python lower bound across every distribution that ships in the package
 and every vendored package's pyproject.toml. This script derives that floor and
-either checks it against the sitecustomize.py version gate (--check) or rewrites
-the gate to match (--write).
+either checks it against the interpreter list the builder resolves wheels for
+(--check) or prunes that list to match (--write).
+
+The list lives in packaging/builder/download.go:
+
+    var supportedPythonVersions = []string{"3.10", "3.11", "3.12", "3.13"}
+
+The builder resolves and installs the payload once per entry, and writes the
+same set into the sitecustomize.py version gate, so this list is the single
+hand-maintained statement of which interpreters the package supports. The gate
+itself is generated from it and must not be edited directly.
+
+An entry below the derived floor is an error: pip cannot resolve the payload for
+an interpreter the bundled distributions reject, so the build either fails or
+ships something that cannot run. A floor below every entry is not an error. The
+top of the list is governed by whether wheels exist rather than by
+Requires-Python, and declining to ship an interpreter the dependencies would
+permit is a deliberate choice.
 
 The shipped distributions are enumerated from the payload directory named by
 --payload-dir: the directory that a "pip install --target" of requirements.txt
@@ -18,16 +34,10 @@ creates in any surrounding virtualenv, and tomli, which only this tool imports.
 Because the floor is a maximum over per-distribution lower bounds, a
 distribution that does not ship can only raise it and never lower it, so
 including one would mask a floor that should drop while --check still reported
-the gate as in sync.
+the list as in sync.
 
-The gate is a plain integer comparison in sitecustomize.py so that the file
-still parses and runs on ancient interpreters. The comparison reads a named
-constant marked with an anchor comment:
-
-    _MINIMUM_PYTHON_MINOR = 10  # sync-minimum-python-version: 3.x minor floor
-
-This script only knows how to keep the minor of a 3.x floor in sync. If the
-derived major is not 3, it exits with an error asking for a gate refactor.
+This tool only knows how to keep a list of 3.x interpreters in sync. If the
+derived major is not 3, it exits with an error asking for a refactor.
 """
 
 from argparse import ArgumentParser
@@ -52,15 +62,15 @@ except ModuleNotFoundError:
 # The lowest major.minor pairs we scan when probing a specifier for the lowest
 # version it admits. Python 3 minors are the realistic range for this project;
 # major 4 is included so that a future 4.x-only floor is detected and reported
-# as needing a gate refactor rather than silently mis-derived.
+# as needing a refactor rather than silently mis-derived.
 _CANDIDATE_VERSIONS = [(3, minor) for minor in range(0, 31)] + [
     (4, minor) for minor in range(0, 31)
 ]
 
-_GATE_CONSTANT_PATTERN = re_compile(
-    r"_MINIMUM_PYTHON_MINOR = (\d+)  # sync-minimum-python-version")
+_SUPPORTED_VERSIONS_PATTERN = re_compile(
+    r"var supportedPythonVersions = \[\]string\{([^}]*)\}")
 
-_HUMAN_READABLE_COMMENT_PATTERN = re_compile(r"# Require Python >= 3\.\d+\b")
+_VERSION_LITERAL_PATTERN = re_compile(r'"(\d+)\.(\d+)"')
 
 
 def lowest_supported_major_minor_across_requires_python(
@@ -91,44 +101,59 @@ def lowest_supported_major_minor_across_requires_python(
     return max(per_specifier_minimums)
 
 
-def read_gate_minor_from_sitecustomize(sitecustomize_text):
-    """Return the current _MINIMUM_PYTHON_MINOR integer from the gate marker."""
-    match = _GATE_CONSTANT_PATTERN.search(sitecustomize_text)
-    if match is None:
-        raise ValueError(
-            "no sync-minimum-python-version marker found in sitecustomize.py")
-    return int(match.group(1))
+def read_supported_versions(builder_text):
+    """Return the (major, minor) pairs listed in supportedPythonVersions.
 
-
-def rewrite_gate_minor_in_sitecustomize(sitecustomize_text, new_minor):
-    """Return sitecustomize text with the gate minor set to new_minor.
-
-    Rewrites both the marked constant line and the human-readable
-    "# Require Python >= 3.N" comment above it. Asserts that exactly one
-    marker line is present before substituting.
+    Takes the text of packaging/builder/download.go. Raises ValueError if the
+    declaration is absent, appears more than once, or lists no version.
     """
-    marker_match_count = len(
-        _GATE_CONSTANT_PATTERN.findall(sitecustomize_text))
-    if marker_match_count != 1:
+    declarations = _SUPPORTED_VERSIONS_PATTERN.findall(builder_text)
+    if len(declarations) != 1:
         raise ValueError(
-            "expected exactly 1 sync-minimum-python-version marker, "
-            "found {}".format(marker_match_count))
-    rewritten = _GATE_CONSTANT_PATTERN.sub(
-        "_MINIMUM_PYTHON_MINOR = {}  # sync-minimum-python-version".format(
-            new_minor),
-        sitecustomize_text)
-    rewritten = _HUMAN_READABLE_COMMENT_PATTERN.sub(
-        "# Require Python >= 3.{}".format(new_minor), rewritten)
-    return rewritten
+            "expected exactly 1 supportedPythonVersions declaration in "
+            "download.go, found {}".format(len(declarations)))
+    versions = [
+        (int(major), int(minor))
+        for major, minor in _VERSION_LITERAL_PATTERN.findall(declarations[0])]
+    if not versions:
+        raise ValueError("supportedPythonVersions lists no version")
+    return versions
+
+
+def prune_supported_versions(builder_text, floor):
+    """Return download.go text with the versions below floor removed.
+
+    floor is a (major, minor) pair. Raises ValueError if pruning would empty
+    the list, which would mean no interpreter the builder knows about can run
+    the bundled distributions at all.
+    """
+    kept = [
+        version for version in read_supported_versions(builder_text)
+        if version >= floor]
+    if not kept:
+        raise ValueError(
+            "pruning to the derived floor {}.{} would empty "
+            "supportedPythonVersions".format(*floor))
+    replacement = "var supportedPythonVersions = []string{{{}}}".format(
+        ", ".join('"{}.{}"'.format(*version) for version in kept))
+    return _SUPPORTED_VERSIONS_PATTERN.sub(
+        lambda _: replacement, builder_text, count=1)
+
+
+def format_versions(versions):
+    """Return a comma-separated "major.minor" rendering of the given pairs."""
+    return ", ".join("{}.{}".format(*version) for version in versions)
 
 
 def main():
     argument_parser = ArgumentParser(description=__doc__)
     script_directory = dirname(__file__)
     argument_parser.add_argument(
-        "--sitecustomize",
-        default=join(script_directory, "sitecustomize.py"),
-        help="path to sitecustomize.py (default: next to this script)")
+        "--download-go",
+        default=join(
+            script_directory, "..", "..", "builder", "download.go"),
+        help="path to download.go, which declares supportedPythonVersions "
+             "(default: the one in this repository)")
     argument_parser.add_argument(
         "--payload-dir",
         required=True,
@@ -144,11 +169,12 @@ def main():
     mode_group.add_argument(
         "--check",
         action="store_true",
-        help="verify the gate matches the derived floor; exit 1 if it differs")
+        help="verify no supported interpreter is below the derived floor; "
+             "exit 1 if one is")
     mode_group.add_argument(
         "--write",
         action="store_true",
-        help="rewrite the gate constant to match the derived floor")
+        help="drop the supported interpreters below the derived floor")
     arguments = argument_parser.parse_args()
 
     # Collect Requires-Python from every shipped distribution, then from every
@@ -187,40 +213,50 @@ def main():
     derived_major, derived_minor = derived_floor
     if derived_major != 3:
         print(
-            "derived minimum Python major is {}, not 3; the sitecustomize.py "
-            "gate refactor only supports 3.x floors and must be updated for "
-            "major-version bumps".format(derived_major),
+            "derived minimum Python major is {}, not 3; "
+            "supportedPythonVersions and the sitecustomize.py gate only "
+            "support 3.x and must be updated for major-version bumps".format(
+                derived_major),
             file=stderr)
         return 1
 
-    with open(arguments.sitecustomize, encoding="utf-8") as sitecustomize_file:
-        sitecustomize_text = sitecustomize_file.read()
-    current_minor = read_gate_minor_from_sitecustomize(sitecustomize_text)
+    with open(arguments.download_go, encoding="utf-8") as builder_file:
+        builder_text = builder_file.read()
+    supported_versions = read_supported_versions(builder_text)
+    below_floor = [
+        version for version in supported_versions if version < derived_floor]
+
+    print("derived minimum Python: {}.{}".format(derived_major, derived_minor))
+    print("supportedPythonVersions: {}".format(
+        format_versions(supported_versions)))
 
     if arguments.check:
-        print("derived minimum Python: 3.{}".format(derived_minor))
-        print("sitecustomize gate: 3.{}".format(current_minor))
-        if derived_minor != current_minor:
+        if below_floor:
             print(
-                "gate is out of sync with the bundled distributions; run "
-                "sync_minimum_python_version.py --write to update it",
+                "supportedPythonVersions lists {} below the derived floor "
+                "{}.{}; pip cannot resolve the payload for those "
+                "interpreters. Run sync_minimum_python_version.py --write to "
+                "drop them.".format(
+                    format_versions(below_floor), derived_major,
+                    derived_minor),
                 file=stderr)
             return 1
-        print("gate is in sync")
+        if min(supported_versions) > derived_floor:
+            print(
+                "note: the bundled distributions would also permit {}.{}, "
+                "which the package does not ship".format(
+                    derived_major, derived_minor))
+        print("supportedPythonVersions is in sync")
         return 0
 
-    if derived_minor == current_minor:
-        print("gate already at 3.{}; nothing to rewrite".format(current_minor))
+    if not below_floor:
+        print("no supported interpreter is below the floor; nothing to prune")
         return 0
-    rewritten_text = rewrite_gate_minor_in_sitecustomize(
-        sitecustomize_text, derived_minor)
-    with open(
-            arguments.sitecustomize, "w",
-            encoding="utf-8") as sitecustomize_file:
-        sitecustomize_file.write(rewritten_text)
-    print(
-        "rewrote sitecustomize gate from 3.{} to 3.{}".format(
-            current_minor, derived_minor))
+    pruned_text = prune_supported_versions(builder_text, derived_floor)
+    with open(arguments.download_go, "w", encoding="utf-8") as builder_file:
+        builder_file.write(pruned_text)
+    print("dropped {} from supportedPythonVersions".format(
+        format_versions(below_floor)))
     return 0
 
 
