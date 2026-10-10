@@ -486,12 +486,13 @@ pyproto-unit-tests:
 			$(PYPROTO_VENDOR_DIR)/$$suite; \
 	done
 
-# Check that the sitecustomize.py version gate stays in sync with the strictest
-# Requires-Python across the distributions that actually ship. The script
-# documents how the floor is derived, why only the shipped payload contributes
-# to it, and why the minimum supported interpreter derives it; it also takes
-# --write to rewrite the gate, and reads MINIMUM_PYTHON and BUILD_DIR from the
-# environment.
+# Check that every interpreter in supportedPythonVersions in
+# packaging/builder/download.go is at or above the strictest Requires-Python
+# across the distributions that actually ship. The script documents how the
+# floor is derived, why only the shipped payload contributes to it, and why the
+# lowest supported interpreter derives it; it also takes --write to drop the
+# listed versions below the floor, and reads MINIMUM_PYTHON and BUILD_DIR from
+# the environment.
 .PHONY: check-minimum-python-version
 check-minimum-python-version:
 	.github/scripts/check-minimum-python-version.sh --check

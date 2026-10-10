@@ -232,6 +232,17 @@ They run in a throwaway virtualenv under `build/`, so the host Python is untouch
 make python-unit-tests
 ```
 
+### Supported Python version check (fast, no containers)
+
+Checks that every interpreter listed in `supportedPythonVersions` in `packaging/builder/download.go` is at or above the strictest `Requires-Python` across the distributions that ship in the Python package.
+The check installs the PyPI pins into a throwaway payload directory with `pip install --target`, the same way the builder assembles the payload, and reads the vendored floors straight from each `pyproject.toml`.
+It needs the lowest listed interpreter to be installed, because its pip must resolve the payload's transitive dependencies the way it would on that floor; set `MINIMUM_PYTHON` to point at that interpreter if it is not on `PATH` under the default name.
+Run `.github/scripts/check-minimum-python-version.sh --write` to drop the listed versions that fall below the derived floor.
+
+```sh
+make check-minimum-python-version
+```
+
 ### Pyproto exporter tests (fast, no containers)
 
 The test suites of the pyproto packages developed under `packaging/common/python/vendor/`.
