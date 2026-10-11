@@ -43,19 +43,6 @@ jobs:
       - name: Run the vendored pyproto exporter test suites
         run: make pyproto-unit-tests
 
-      - name: Resolve the minimum supported Python version
-        id: minimum_supported_python_version
-        run: |
-          version="$(python3 \
-            tools/python/tools/print_minimum_supported_python_version.py)"
-          test -n "${version}"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-
-      - name: Set up the interpreter for the minimum supported Python version
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: ${{ steps.minimum_supported_python_version.outputs.version }}
-
       - name: Check the supported Python versions are in sync with the bundled distributions
         run: make check-supported-python-versions
 

@@ -495,11 +495,10 @@ pyproto-unit-tests:
 
 # Check that no supported Python version is below the minimum required Python
 # version. Both terms, the two phases this runs in, and the environment
-# variables MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR are documented
-# in the module docstring of tools/python/tools/shared.py, which is the only
-# place either term is defined. Run
-# tools/python/tools/prune_supported_python_versions.py to drop the versions
-# this reports.
+# variable BUILD_DIR are documented in the module docstring of
+# tools/python/tools/shared.py, which is the only place either term is
+# defined. Run tools/python/tools/prune_supported_python_versions.py to drop
+# the versions this reports.
 .PHONY: check-supported-python-versions
 check-supported-python-versions:
 	python3 tools/python/tools/check_supported_python_versions.py
