@@ -48,6 +48,7 @@ make clean                     # Remove build/
 - `packaging/tests/lifecycle/` — Package lifecycle tests (preload scripts, config handling, install/remove)
 - `packaging/tests/vendor/` — Vendor replacement tests; `mkvendor/` builds the mock acme package
 - `packaging/common/<component>/release.txt` — Renovate-managed upstream version pins (Python pins live in `packaging/common/python/requirements.txt`)
+- `tools/supported-python-versions/` — Repository tooling, never packaged: the scripts that print, check and prune the supported Python versions, plus `common.py`, whose module docstring is the only definition of the terms they use
 
 ## Coding conventions
 

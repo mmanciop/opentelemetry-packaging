@@ -23,7 +23,7 @@ PRUNE_SCRIPT_PATH = str(
     Path(__file__).with_name("prune-supported-python-versions.py"))
 
 SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE = (
-    Path(__file__).parents[2] / "builder"
+    Path(__file__).resolve().parents[2] / "packaging" / "builder"
     / "supported_python_versions.json")
 
 

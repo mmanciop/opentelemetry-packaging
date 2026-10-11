@@ -114,7 +114,6 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from importlib.metadata import distributions
 from json import JSONDecodeError, dumps, loads
 from os import environ
-from os.path import dirname, join
 from pathlib import Path
 from shutil import rmtree, which
 from subprocess import CalledProcessError, run
@@ -135,7 +134,13 @@ _CANDIDATE_PYTHON_VERSIONS = [(3, minor) for minor in range(0, 31)] + [
 
 SUPPORTED_PYTHON_VERSIONS_FILE_NAME = "supported_python_versions.json"
 
-_SCRIPT_DIRECTORY = dirname(__file__)
+# These scripts live outside packaging/, so every path they need is
+# derived from the repository root rather than from the directory they
+# sit in.
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+_PYTHON_PACKAGING_DIRECTORY = (
+    _REPOSITORY_ROOT / "packaging" / "common" / "python")
 
 
 class MinimumRequiredPythonVersionError(Exception):
@@ -149,9 +154,9 @@ def build_argument_parser(description):
         formatter_class=RawDescriptionHelpFormatter)
     argument_parser.add_argument(
         "--supported-python-versions-file",
-        default=join(
-            _SCRIPT_DIRECTORY, "..", "..", "builder",
-            SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
+        default=str(
+            _REPOSITORY_ROOT / "packaging" / "builder"
+            / SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
         help="path to the JSON array of supported Python versions that "
              "packaging/builder/download.go embeds "
              "(default: the one in this repository)")
@@ -170,9 +175,9 @@ def add_payload_arguments(argument_parser):
              "and then re-invokes this script with the directory it built")
     argument_parser.add_argument(
         "--vendor-dir",
-        default=join(_SCRIPT_DIRECTORY, "vendor"),
+        default=str(_PYTHON_PACKAGING_DIRECTORY / "vendor"),
         help="directory tree searched for vendored pyproject.toml files "
-             "(default: the vendor dir next to this script)")
+             "(default: packaging/common/python/vendor)")
 
 
 def read_supported_python_versions(supported_python_versions_text):
@@ -339,9 +344,8 @@ def prepare_payload_and_rerun_in_the_virtualenv(
             file=stderr)
         return 1
 
-    repository_root = Path(_SCRIPT_DIRECTORY).resolve().parents[2]
     build_directory = Path(
-        environ.get("BUILD_DIR", str(repository_root / "build")))
+        environ.get("BUILD_DIR", str(_REPOSITORY_ROOT / "build")))
     venv_directory = (
         build_directory / "minimum-supported-python-version-venv")
     payload_directory = (
@@ -349,11 +353,11 @@ def prepare_payload_and_rerun_in_the_virtualenv(
     pinned_requirements_path = (
         build_directory / "minimum-supported-python-version-requirements.txt")
 
-    with open(join(_SCRIPT_DIRECTORY, "requirements.txt"),
-              encoding="utf-8") as requirements_file:
-        pinned_requirements = [
-            line for line in requirements_file.read().splitlines()
-            if not line.startswith("./vendor/")]
+    pinned_requirements = [
+        line for line
+        in (_PYTHON_PACKAGING_DIRECTORY / "requirements.txt").read_text(
+            encoding="utf-8").splitlines()
+        if not line.startswith("./vendor/")]
     build_directory.mkdir(parents=True, exist_ok=True)
     pinned_requirements_path.write_text(
         "\n".join(pinned_requirements) + "\n", encoding="utf-8")
