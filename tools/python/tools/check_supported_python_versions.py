@@ -29,7 +29,7 @@ from common import (
 )
 
 
-def main():
+def main() -> int:
     argument_parser = build_argument_parser(__doc__)
     add_payload_arguments(argument_parser)
     arguments = argument_parser.parse_args()
@@ -55,7 +55,7 @@ def main():
     print("supported Python versions: {}".format(
         format_python_versions(supported_python_versions)))
 
-    below_minimum_required_python_version = [
+    below_minimum_required_python_version: list[tuple[int, int]] = [
         version for version in supported_python_versions
         if version < minimum_required_python_version]
     if below_minimum_required_python_version:

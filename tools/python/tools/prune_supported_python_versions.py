@@ -32,8 +32,9 @@ from common import (
 
 
 def prune_supported_python_versions(
-    supported_python_versions_text, minimum_required_python_version
-):
+    supported_python_versions_text: str,
+    minimum_required_python_version: tuple[int, int],
+) -> str:
     """Return the supported Python versions JSON without the ones below.
 
     minimum_required_python_version is a (major, minor) pair. Raises
@@ -41,7 +42,7 @@ def prune_supported_python_versions(
     interpreter the builder knows about can run the bundled distributions
     at all.
     """
-    kept = [
+    kept: list[tuple[int, int]] = [
         version
         for version in read_supported_python_versions(
             supported_python_versions_text)
@@ -55,7 +56,7 @@ def prune_supported_python_versions(
     return dumps(["{}.{}".format(*version) for version in kept]) + "\n"
 
 
-def main():
+def main() -> int:
     argument_parser = build_argument_parser(__doc__)
     add_payload_arguments(argument_parser)
     arguments = argument_parser.parse_args()
@@ -82,7 +83,7 @@ def main():
     print("supported Python versions: {}".format(
         format_python_versions(supported_python_versions)))
 
-    below_minimum_required_python_version = [
+    below_minimum_required_python_version: list[tuple[int, int]] = [
         version for version in supported_python_versions
         if version < minimum_required_python_version]
     if not below_minimum_required_python_version:

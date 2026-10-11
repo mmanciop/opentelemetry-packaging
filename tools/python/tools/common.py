@@ -112,7 +112,12 @@ version has a major version other than 3, they exit with an error asking for a
 refactor.
 """
 
-from argparse import ArgumentParser, RawDescriptionHelpFormatter
+from argparse import (
+    ArgumentParser,
+    Namespace,
+    RawDescriptionHelpFormatter,
+)
+from collections.abc import Iterable
 from importlib.metadata import distributions
 from json import JSONDecodeError, loads
 from os import environ
@@ -130,18 +135,21 @@ from sys import stderr
 # version it admits. Python 3 minors are the realistic range for this project;
 # major 4 is included so that a future 4.x-only minimum is detected and
 # reported as needing a refactor rather than silently mis-derived.
-_CANDIDATE_PYTHON_VERSIONS = [(3, minor) for minor in range(0, 31)] + [
+_CANDIDATE_PYTHON_VERSIONS: list[tuple[int, int]] = [
+    (3, minor) for minor in range(0, 31)
+] + [
     (4, minor) for minor in range(0, 31)
 ]
 
-SUPPORTED_PYTHON_VERSIONS_FILE_NAME = "supported_python_versions.json"
+SUPPORTED_PYTHON_VERSIONS_FILE_NAME: str = (
+    "supported_python_versions.json")
 
 # These scripts live outside packaging/, so every path they need is
 # derived from the repository root rather than from the directory they
 # sit in.
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+_REPOSITORY_ROOT: Path = Path(__file__).resolve().parents[3]
 
-_PYTHON_PACKAGING_DIRECTORY = (
+_PYTHON_PACKAGING_DIRECTORY: Path = (
     _REPOSITORY_ROOT / "packaging" / "common" / "python")
 
 
@@ -149,7 +157,7 @@ class MinimumRequiredPythonVersionError(Exception):
     """The minimum required Python version could not be derived or is 4.x."""
 
 
-def build_argument_parser(description):
+def build_argument_parser(description: str) -> ArgumentParser:
     """Return a parser carrying the option every script in this set takes."""
     argument_parser = ArgumentParser(
         description=description,
@@ -165,7 +173,7 @@ def build_argument_parser(description):
     return argument_parser
 
 
-def add_payload_arguments(argument_parser):
+def add_payload_arguments(argument_parser: ArgumentParser) -> None:
     """Add the options naming where the bundled distributions are found."""
     argument_parser.add_argument(
         "--payload-dir",
@@ -182,7 +190,9 @@ def add_payload_arguments(argument_parser):
              "(default: packaging/common/python/vendor)")
 
 
-def read_supported_python_versions(supported_python_versions_text):
+def read_supported_python_versions(
+    supported_python_versions_text: str
+) -> list[tuple[int, int]]:
     """Return the (major, minor) pairs of the supported Python versions.
 
     Takes the text of packaging/builder/supported_python_versions.json, which
@@ -203,7 +213,7 @@ def read_supported_python_versions(supported_python_versions_text):
         raise ValueError(
             "{} lists no version".format(
                 SUPPORTED_PYTHON_VERSIONS_FILE_NAME))
-    versions = []
+    versions: list[tuple[int, int]] = []
     for entry in parsed:
         major, _, minor = entry.partition(".") if isinstance(
             entry, str) else ("", "", "")
@@ -215,14 +225,14 @@ def read_supported_python_versions(supported_python_versions_text):
     return versions
 
 
-def format_python_versions(versions):
+def format_python_versions(versions: Iterable[tuple[int, int]]) -> str:
     """Return a comma-separated "major.minor" rendering of the given pairs."""
     return ", ".join("{}.{}".format(*version) for version in versions)
 
 
 def derive_minimum_required_python_version_from_bundled_distributions(
-    payload_directory, vendor_directory
-):
+    payload_directory: str, vendor_directory: str
+) -> tuple[int, int]:
     """Return the minimum required Python version of what the package ships.
 
     Reads Requires-Python from every distribution installed in
@@ -266,7 +276,7 @@ def derive_minimum_required_python_version_from_bundled_distributions(
     from packaging.specifiers import SpecifierSet
     from packaging.version import Version
 
-    per_distribution_minimums = []
+    per_distribution_minimums: list[tuple[int, int]] = []
     for requires_python in requires_python_strings:
         if not requires_python:
             continue
@@ -293,8 +303,10 @@ def derive_minimum_required_python_version_from_bundled_distributions(
 
 
 def prepare_payload_and_rerun_in_the_virtualenv(
-    script_path, minimum_supported_python_version, arguments
-):
+    script_path: str,
+    minimum_supported_python_version: tuple[int, int],
+    arguments: Namespace,
+) -> int:
     """Build the virtualenv and the payload, then rerun script_path in it.
 
     This is the preparation phase the module docstring describes. Returns the

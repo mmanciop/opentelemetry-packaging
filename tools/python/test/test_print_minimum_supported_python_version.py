@@ -19,7 +19,7 @@ from python_version_test_helpers import (
 
 class TestPrintMinimumSupportedPythonVersion(TestCase):
 
-    def test_prints_the_lowest_entry_and_needs_no_payload(self):
+    def test_prints_the_lowest_entry_and_needs_no_payload(self) -> None:
         # CI runs this before any interpreter is installed, to decide which
         # one to install, so it must work without a virtualenv or a payload.
         # The entries are out of order so that the lowest one rather than the
@@ -41,7 +41,9 @@ class TestPrintMinimumSupportedPythonVersion(TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertEqual("3.10", completed.stdout.strip())
 
-    def test_the_shipped_file_prints_the_version_the_workflow_installs(self):
+    def test_the_shipped_file_prints_the_version_the_workflow_installs(
+        self
+    ) -> None:
         completed = run(
             [executable, PRINT_SCRIPT_PATH],
             capture_output=True, text=True)

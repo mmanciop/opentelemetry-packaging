@@ -8,30 +8,34 @@ The file name deliberately does not match the test_*.py pattern that
 rather than collected as one.
 """
 
+from collections.abc import Iterable
 from json import dumps
 from pathlib import Path
-from subprocess import run
+from subprocess import CompletedProcess, run
 from sys import executable
 
-_TOOLS_DIRECTORY = Path(__file__).resolve().parents[1] / "tools"
+_TOOLS_DIRECTORY: Path = Path(__file__).resolve().parents[1] / "tools"
 
-CHECK_SCRIPT_PATH = str(
+CHECK_SCRIPT_PATH: str = str(
     _TOOLS_DIRECTORY / "check_supported_python_versions.py")
 
-PRINT_SCRIPT_PATH = str(
+PRINT_SCRIPT_PATH: str = str(
     _TOOLS_DIRECTORY / "print_minimum_supported_python_version.py")
 
-PRUNE_SCRIPT_PATH = str(
+PRUNE_SCRIPT_PATH: str = str(
     _TOOLS_DIRECTORY / "prune_supported_python_versions.py")
 
-SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE = (
+SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE: Path = (
     Path(__file__).resolve().parents[3] / "packaging" / "builder"
     / "supported_python_versions.json")
 
 
 def write_dist_info_with_requires_python(
-    payload_directory, name, version, requires_python
-):
+    payload_directory: Path,
+    name: str,
+    version: str,
+    requires_python: str | None,
+) -> None:
     """Create a <name>-<version>.dist-info/METADATA under payload_directory.
 
     This is the minimum importlib.metadata needs to enumerate a distribution
@@ -42,7 +46,7 @@ def write_dist_info_with_requires_python(
     dist_info_directory = payload_directory / "{}-{}.dist-info".format(
         name, version)
     dist_info_directory.mkdir(parents=True)
-    metadata = (
+    metadata: str = (
         "Metadata-Version: 2.1\n"
         "Name: {}\n"
         "Version: {}\n".format(name, version))
@@ -53,17 +57,19 @@ def write_dist_info_with_requires_python(
 
 
 def write_supported_python_versions_file(
-    supported_python_versions_path, versions
-):
+    supported_python_versions_path: Path, versions: Iterable[str]
+) -> None:
     """Write a versions file listing the given "major.minor" strings."""
     supported_python_versions_path.write_text(
         dumps(list(versions)) + "\n", encoding="utf-8")
 
 
 def run_payload_script(
-    script_path, payload_directory, vendor_directory,
-    supported_python_versions_path
-):
+    script_path: str,
+    payload_directory: Path,
+    vendor_directory: Path,
+    supported_python_versions_path: Path,
+) -> CompletedProcess[str]:
     """Run a payload script's work phase and return the completed run.
 
     Passing --payload-dir selects the work phase directly, so no virtualenv

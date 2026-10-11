@@ -19,7 +19,7 @@ class TestPayloadScopedEnumeration(TestCase):
 
     def test_minimum_required_python_version_comes_only_from_the_payload_directory(
         self
-    ):
+    ) -> None:
         # The payload declares a single distribution at >=3.7, so the
         # minimum required Python version is 3.7. The interpreter running
         # this test has packaging installed (>=3.9), plus pip and
@@ -55,7 +55,7 @@ class TestPayloadScopedEnumeration(TestCase):
 
     def test_strictest_payload_distribution_decides_the_minimum_required_python_version(
         self
-    ):
+    ) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -84,7 +84,7 @@ class TestPayloadScopedEnumeration(TestCase):
         self.assertIn(
             "minimum required Python version: 3.11", completed.stdout)
 
-    def test_missing_payload_directory_fails(self):
+    def test_missing_payload_directory_fails(self) -> None:
         # A mistyped or unbuilt payload path must be an error rather than a
         # derivation from the vendored pyproject files alone, which would
         # silently report a minimum lower than the one the package ships.
@@ -115,7 +115,7 @@ class TestPayloadScopedEnumeration(TestCase):
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("no distributions found", completed.stderr)
 
-    def test_empty_payload_directory_fails(self):
+    def test_empty_payload_directory_fails(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -143,7 +143,7 @@ class TestPayloadScopedEnumeration(TestCase):
 
 class TestVendorPyprojectParsing(TestCase):
 
-    def test_check_reads_requires_python_from_vendor_pyproject(self):
+    def test_check_reads_requires_python_from_vendor_pyproject(self) -> None:
         # The payload minimum (3.8) is below the only vendored pyproject
         # minimum (3.12), which must therefore drive the check to reject a
         # list that still starts at 3.10. This proves the script reads
@@ -184,7 +184,7 @@ class TestCheckOutcome(TestCase):
 
     def test_check_passes_when_every_supported_python_version_meets_the_minimum_required_python_version(
         self
-    ):
+    ) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -212,7 +212,7 @@ class TestCheckOutcome(TestCase):
 
     def test_check_fails_when_a_supported_python_version_is_below_the_minimum_required_python_version(
         self
-    ):
+    ) -> None:
         # This is the regression the check exists for: a dependency bump
         # raises the minimum to 3.11 while the builder still tries to resolve
         # the payload for 3.10, which pip cannot do.
@@ -243,7 +243,9 @@ class TestCheckOutcome(TestCase):
         self.assertIn(
             "prune_supported_python_versions.py", completed.stderr)
 
-    def test_check_leaves_the_supported_python_versions_file_untouched(self):
+    def test_check_leaves_the_supported_python_versions_file_untouched(
+        self
+    ) -> None:
         # The check must never write, however stale the list is. Only
         # prune_supported_python_versions.py rewrites the file.
         with TemporaryDirectory() as temporary_directory:
@@ -277,7 +279,7 @@ class TestCheckOutcome(TestCase):
 
     def test_check_passes_with_a_note_when_the_minimum_required_python_version_is_below_every_supported_python_version(
         self
-    ):
+    ) -> None:
         # Shipping fewer interpreters than the dependencies permit is a
         # deliberate choice, because wheel availability rather than
         # Requires-Python governs the top of the list, so this reports rather

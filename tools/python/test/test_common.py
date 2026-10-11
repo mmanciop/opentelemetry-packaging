@@ -23,7 +23,9 @@ class TestDeriveMinimumRequiredPythonVersion(TestCase):
     with no pip and no network.
     """
 
-    def derive_from_requires_python(self, *requires_python_strings):
+    def derive_from_requires_python(
+        self, *requires_python_strings: str | None
+    ) -> tuple[int, int]:
         """Return the value derived from a payload declaring these strings.
 
         None stands for a distribution that ships no Requires-Python at all,
@@ -43,28 +45,28 @@ class TestDeriveMinimumRequiredPythonVersion(TestCase):
             return derive_minimum_required_python_version_from_bundled_distributions(
                 str(payload_directory), str(vendor_directory))
 
-    def test_strictest_lower_bound_wins(self):
+    def test_strictest_lower_bound_wins(self) -> None:
         self.assertEqual(
             self.derive_from_requires_python(">=3.8", ">=3.11", ">=3.9"),
             (3, 11))
 
-    def test_compatible_release_specifier_resolves_to_its_minor(self):
+    def test_compatible_release_specifier_resolves_to_its_minor(self) -> None:
         self.assertEqual(
             self.derive_from_requires_python("~=3.11"), (3, 11))
 
-    def test_a_distribution_without_requires_python_is_ignored(self):
+    def test_a_distribution_without_requires_python_is_ignored(self) -> None:
         self.assertEqual(
             self.derive_from_requires_python(None, ">=3.10"), (3, 10))
 
-    def test_no_distribution_declaring_anything_raises(self):
+    def test_no_distribution_declaring_anything_raises(self) -> None:
         with self.assertRaises(MinimumRequiredPythonVersionError):
             self.derive_from_requires_python(None, None)
 
-    def test_an_empty_payload_directory_raises(self):
+    def test_an_empty_payload_directory_raises(self) -> None:
         with self.assertRaises(MinimumRequiredPythonVersionError):
             self.derive_from_requires_python()
 
-    def test_a_major_version_other_than_3_raises(self):
+    def test_a_major_version_other_than_3_raises(self) -> None:
         # The data file and the sitecustomize.py gate only handle 3.x, so a
         # 4.x-only payload has to stop the run rather than be mis-derived.
         with self.assertRaises(MinimumRequiredPythonVersionError):
@@ -73,7 +75,7 @@ class TestDeriveMinimumRequiredPythonVersion(TestCase):
 
 class TestReadSupportedPythonVersions(TestCase):
 
-    def test_read_supported_python_versions_from_the_json_array(self):
+    def test_read_supported_python_versions_from_the_json_array(self) -> None:
         # Deliberately not the versions the package ships: this exercises the
         # parser, so the input has to be fixed rather than whatever
         # supported_python_versions.json happens to list today.
@@ -81,19 +83,19 @@ class TestReadSupportedPythonVersions(TestCase):
             read_supported_python_versions('["3.4", "3.5", "4.0"]\n'),
             [(3, 4), (3, 5), (4, 0)])
 
-    def test_read_malformed_json_raises(self):
+    def test_read_malformed_json_raises(self) -> None:
         with self.assertRaises(ValueError):
             read_supported_python_versions('["3.10",\n')
 
-    def test_read_a_non_array_document_raises(self):
+    def test_read_a_non_array_document_raises(self) -> None:
         with self.assertRaises(ValueError):
             read_supported_python_versions('{"versions": ["3.10"]}')
 
-    def test_read_an_empty_array_raises(self):
+    def test_read_an_empty_array_raises(self) -> None:
         with self.assertRaises(ValueError):
             read_supported_python_versions("[]")
 
-    def test_read_a_non_python_version_entry_raises(self):
+    def test_read_a_non_python_version_entry_raises(self) -> None:
         for entry in ('"three.ten"', '"3"', "310", "null"):
             with self.subTest(entry=entry):
                 with self.assertRaises(ValueError):

@@ -17,7 +17,7 @@ from pathlib import Path
 from common import build_argument_parser, read_supported_python_versions
 
 
-def main():
+def main() -> int:
     arguments = build_argument_parser(__doc__).parse_args()
 
     supported_python_versions = read_supported_python_versions(

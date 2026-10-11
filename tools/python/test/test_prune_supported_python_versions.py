@@ -27,7 +27,7 @@ class TestPruneTheSupportedPythonVersionsText(TestCase):
     tests asserting against a list the package no longer ships.
     """
 
-    def setUp(self):
+    def setUp(self) -> None:
         self.shipped_text = SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE.read_text(
             encoding="utf-8")
         self.shipped_versions = read_supported_python_versions(
@@ -38,7 +38,7 @@ class TestPruneTheSupportedPythonVersionsText(TestCase):
 
     def test_prune_drops_only_the_supported_python_versions_below_the_minimum_required_python_version(
         self
-    ):
+    ) -> None:
         second_lowest_version = sorted(self.shipped_versions)[1]
 
         pruned = read_supported_python_versions(
@@ -49,7 +49,7 @@ class TestPruneTheSupportedPythonVersionsText(TestCase):
         self.assertEqual(len(pruned), len(self.shipped_versions) - 1)
         self.assertEqual(min(pruned), second_lowest_version)
 
-    def test_prune_output_matches_the_shipped_file_formatting(self):
+    def test_prune_output_matches_the_shipped_file_formatting(self) -> None:
         # The pruned text is written back over the file the Go builder
         # embeds, so a prune run must not reformat it into something a
         # reviewer sees as an unrelated change. Pruning at the lowest shipped
@@ -59,13 +59,15 @@ class TestPruneTheSupportedPythonVersionsText(TestCase):
                 self.shipped_text, min(self.shipped_versions)),
             self.shipped_text)
 
-    def test_prune_below_every_supported_python_version_changes_nothing(self):
+    def test_prune_below_every_supported_python_version_changes_nothing(
+        self
+    ) -> None:
         self.assertEqual(
             read_supported_python_versions(
                 prune_supported_python_versions(self.shipped_text, (3, 0))),
             self.shipped_versions)
 
-    def test_prune_that_would_empty_the_list_raises(self):
+    def test_prune_that_would_empty_the_list_raises(self) -> None:
         with self.assertRaises(ValueError):
             prune_supported_python_versions(self.shipped_text, (9, 99))
 
@@ -74,7 +76,7 @@ class TestPruneScriptEndToEnd(TestCase):
 
     def test_prune_drops_the_supported_python_versions_below_the_minimum_required_python_version(
         self
-    ):
+    ) -> None:
         # The versions the package ships go in, and a vendored pyproject
         # demanding the second-lowest of them puts the minimum required
         # Python version there, so the prune must drop the lowest one and
@@ -119,7 +121,7 @@ class TestPruneScriptEndToEnd(TestCase):
             loads(rewritten),
             ["{}.{}".format(*version) for version in shipped_versions[1:]])
 
-    def test_prune_writes_nothing_when_no_version_is_below(self):
+    def test_prune_writes_nothing_when_no_version_is_below(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
