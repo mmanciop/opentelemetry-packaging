@@ -36,6 +36,12 @@ class TestPayloadScopedEnumeration(TestCase):
             vendor_directory.mkdir()
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.7", "3.8"])
 
@@ -59,6 +65,12 @@ class TestPayloadScopedEnumeration(TestCase):
             vendor_directory.mkdir()
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.11", "3.12"])
 
@@ -85,6 +97,12 @@ class TestPayloadScopedEnumeration(TestCase):
                 encoding="utf-8")
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10"])
 
@@ -104,6 +122,12 @@ class TestPayloadScopedEnumeration(TestCase):
             vendor_directory.mkdir()
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10"])
 
@@ -137,6 +161,12 @@ class TestVendorPyprojectParsing(TestCase):
                 encoding="utf-8")
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
@@ -161,6 +191,12 @@ class TestCheckOutcome(TestCase):
             vendor_directory.mkdir()
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.11", "3.12"])
 
@@ -185,6 +221,12 @@ class TestCheckOutcome(TestCase):
             vendor_directory.mkdir()
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
@@ -209,6 +251,12 @@ class TestCheckOutcome(TestCase):
             vendor_directory.mkdir()
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
             before = supported_python_versions_path.read_text(
@@ -238,6 +286,12 @@ class TestCheckOutcome(TestCase):
             vendor_directory.mkdir()
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11"])
 
