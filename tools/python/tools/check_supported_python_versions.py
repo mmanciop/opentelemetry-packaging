@@ -8,7 +8,7 @@ defined in the module docstring of shared.py, next to this script, which is
 the only place either term is defined. That docstring also documents the two
 phases this script runs in, why a supported Python version below the minimum
 required Python version is an error while the converse is not, and the
-environment variables MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR.
+environment variable BUILD_DIR.
 
 This script never writes a file. Run prune_supported_python_versions.py to
 drop the versions it reports.
@@ -40,7 +40,7 @@ def main() -> int:
 
     if arguments.payload_dir is None:
         return prepare_payload_and_rerun_in_the_virtualenv(
-            __file__, min(supported_python_versions), arguments)
+            __file__, supported_python_versions, arguments)
 
     try:
         minimum_required_python_version = (
@@ -49,6 +49,11 @@ def main() -> int:
     except MinimumRequiredPythonVersionError as error:
         print(error, file=stderr)
         return 1
+
+    if arguments.lowest_resolvable_python_version is not None:
+        minimum_required_python_version = max(
+            minimum_required_python_version,
+            arguments.lowest_resolvable_python_version)
 
     print("minimum required Python version: {}.{}".format(
         *minimum_required_python_version))

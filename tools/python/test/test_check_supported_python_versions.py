@@ -15,6 +15,79 @@ from shared_test import (
 )
 
 
+class TestTheLowestResolvablePythonVersionFloor(TestCase):
+    """What the preparation phase found pip could resolve raises the minimum.
+
+    A pin that stops supporting an interpreter is invisible to the metadata
+    in the payload, because the payload can only hold what did resolve. The
+    preparation phase reports the lowest supported Python version it could
+    resolve for, and these cases drive that value in directly.
+    """
+
+    def test_a_floor_above_the_metadata_minimum_fails_the_check(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            payload_directory = temporary_path / "payload"
+            # The payload says 3.10 is fine, which is what the metadata of
+            # whatever resolved always says. Only the floor knows 3.10 could
+            # not be resolved at all.
+            write_dist_info_with_requires_python(
+                payload_directory, "shipped_thing", "1.0", ">=3.10")
+            vendor_directory = temporary_path / "vendor"
+            vendor_directory.mkdir()
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.10", "3.11", "3.12"])
+
+            completed = run_payload_script(
+                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+                supported_python_versions_path,
+                lowest_resolvable_python_version="3.11")
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn(
+            "minimum required Python version: 3.11", completed.stdout)
+        self.assertIn("lists 3.10 below", completed.stderr)
+        self.assertIn(
+            "prune_supported_python_versions.py", completed.stderr)
+
+    def test_a_floor_below_the_metadata_minimum_changes_nothing(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            payload_directory = temporary_path / "payload"
+            write_dist_info_with_requires_python(
+                payload_directory, "shipped_thing", "1.0", ">=3.11")
+            vendor_directory = temporary_path / "vendor"
+            vendor_directory.mkdir()
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            # This list is invented, not read from
+            # packaging/builder/supported_python_versions.json. The case
+            # needs a fixed relationship between these versions and the
+            # synthetic inputs above, so reading the shipped list would
+            # stop this test exercising what it was written for as soon
+            # as that file changes.
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.11", "3.12"])
+
+            completed = run_payload_script(
+                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+                supported_python_versions_path,
+                lowest_resolvable_python_version="3.11")
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn(
+            "minimum required Python version: 3.11", completed.stdout)
+        self.assertIn("in sync", completed.stdout)
+
+
 class TestPayloadScopedEnumeration(TestCase):
 
     def test_minimum_required_python_version_comes_only_from_the_payload_directory(

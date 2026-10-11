@@ -37,17 +37,20 @@ Minimum required Python version
     for every bundled distribution at once, and the lowest version that
     satisfies all of them is the strictest of their individual lower bounds.
 
-    Note that this is the algorithm and not the stronger property "the lowest
-    Python version on which every bundled distribution installs". The two
-    coincide only while every Requires-Python is a plain lower bound such as
-    ">=3.10", which is true of all of them today. A specifier carrying an
-    exclusion, such as ">=3.9,!=3.10.*", would contribute a minimum of 3.9
-    and nothing here would notice that 3.10 is excluded.
+    Raised, when the work phase is given --lowest-resolvable-python-version,
+    to at least the lowest supported Python version pip could resolve the
+    pins for. Reading Requires-Python is the weaker test: it would miss a
+    specifier carrying an exclusion, such as ">=3.9,!=3.10.*", which
+    contributes a minimum of 3.9 while 3.10 is excluded, and it would miss a
+    version for which no wheel is published at all. Whether pip can resolve
+    the pins for a version is the property that actually decides whether the
+    package can be built for it, so where the two disagree the resolution
+    wins.
 
 The three scripts that import this module
     print_minimum_supported_python_version.py prints the minimum supported
-    Python version and exits. CI runs it to decide which interpreter to
-    install before running the check.
+    Python version and exits. It is the way to read that value out of the
+    data file without a JSON parser at the call site.
 
     check_supported_python_versions.py exits 1 when a supported Python
     version is below the minimum required Python version.
@@ -58,27 +61,41 @@ The three scripts that import this module
     than one script in this directory uses.
 
 check_supported_python_versions.py and prune_supported_python_versions.py
-each run in two phases, in two different interpreters.
+each run in two phases.
 
 The preparation phase runs under whatever python3 invoked the script. It
-builds a virtualenv with the interpreter for the minimum supported Python
-version, installs the scripts' own dependencies into it, installs the PyPI
-pins from requirements.txt into a payload directory with "pip install
---target", and then re-invokes the same script with that interpreter and
---payload-dir. MINIMUM_SUPPORTED_PYTHON_INTERPRETER overrides the interpreter
-it looks for, and BUILD_DIR overrides where the virtualenv and the payload are
-written (default: build/ at the repository root, which "make clean" removes).
+builds a virtualenv with that same interpreter, installs the scripts' own
+dependencies into it, resolves the PyPI pins from requirements.txt into a
+payload directory with "pip install --target", and then re-invokes the same
+script with --payload-dir. BUILD_DIR overrides where the virtualenv and the
+payload are written (default: build/ at the repository root, which
+"make clean" removes).
 
 The work phase is the re-invocation. It runs inside that virtualenv, where
 packaging and tomli are importable, and it does the derivation and then the
 check or the prune. Passing --payload-dir directly selects this phase without
 any preparation, which is what the unit tests do.
 
-The virtualenv is built with the interpreter for the minimum supported Python
-version on purpose: its pip must resolve the payload's transitive dependencies
-the way it would on that version, so a newer release of a transitive
-dependency that raised its own Requires-Python does not inflate the minimum
-required Python version above what actually runs there.
+The payload is resolved with "--python-version <target> --only-binary=:all:"
+rather than by running the target interpreter, which is how
+packaging/builder/download.go resolves it too. pip treats --python-version as
+a resolution target, so transitive dependencies resolve the way they would on
+that version without that interpreter being installed anywhere. A newer
+release of a transitive dependency that raised its own Requires-Python
+therefore does not inflate the minimum required Python version above what
+actually runs there.
+
+The preparation phase resolves for each supported Python version in ascending
+order and stops at the first one that resolves, which is one resolution in the
+ordinary case. A version pip cannot resolve the pins for is one the package
+can no longer be built for, whatever the metadata says, so the lowest
+supported Python version that resolves is a floor on the minimum required
+Python version and is passed to the work phase as
+--lowest-resolvable-python-version. Without that floor, a bump that raises a
+pin's Requires-Python above the minimum supported Python version would stop
+the preparation phase on a pip error before the derivation ever ran, which is
+also what stopped prune_supported_python_versions.py from being able to fix
+it.
 
 The vendored requires-python values are read straight from each vendor
 pyproject.toml under --vendor-dir, so the vendored source never has to be
@@ -122,9 +139,9 @@ from importlib.metadata import distributions
 from json import JSONDecodeError, loads
 from os import environ
 from pathlib import Path
-from shutil import rmtree, which
+from shutil import rmtree
 from subprocess import CalledProcessError, run
-from sys import stderr
+from sys import executable, stderr
 
 # packaging and tomli are imported where they are used rather than here,
 # because the preparation phase runs under whatever python3 invoked the script
@@ -188,6 +205,16 @@ def add_payload_arguments(argument_parser: ArgumentParser) -> None:
         default=str(_PYTHON_PACKAGING_DIRECTORY / "vendor"),
         help="directory tree searched for vendored pyproject.toml files "
              "(default: packaging/common/python/vendor)")
+    argument_parser.add_argument(
+        "--lowest-resolvable-python-version",
+        default=None,
+        type=python_version_pair,
+        help="the lowest supported Python version pip could resolve the "
+             "pinned requirements for, as a \"major.minor\" string. The "
+             "preparation phase passes what it found; it raises the minimum "
+             "required Python version to at least this, so that a version no "
+             "longer resolvable is reported even when the metadata alone "
+             "would not show it")
 
 
 def python_version_pair(version_text: str) -> tuple[int, int]:
@@ -315,30 +342,18 @@ def derive_minimum_required_python_version_from_bundled_distributions(
 
 def prepare_payload_and_rerun_in_the_virtualenv(
     script_path: str,
-    minimum_supported_python_version: tuple[int, int],
+    supported_python_versions: list[tuple[int, int]],
     arguments: Namespace,
 ) -> int:
     """Build the virtualenv and the payload, then rerun script_path in it.
 
-    This is the preparation phase the module docstring describes. Returns the
-    exit status the caller should exit with: the rerun script's own status, or
-    a non-zero one if a preparation step failed.
+    This is the preparation phase the module docstring describes. Resolves the
+    pins for each supported Python version in ascending order, stopping at the
+    first that resolves, and passes that version to the work phase as
+    --lowest-resolvable-python-version. Returns the exit status the caller
+    should exit with: the rerun script's own status, or a non-zero one if a
+    preparation step failed.
     """
-    interpreter_name = environ.get(
-        "MINIMUM_SUPPORTED_PYTHON_INTERPRETER",
-        "python{}.{}".format(*minimum_supported_python_version))
-    interpreter = which(interpreter_name)
-    if interpreter is None:
-        print(
-            "error: {} is not installed. The minimum required Python "
-            "version must be derived with the interpreter for the minimum "
-            "supported Python version, so that pip resolves transitive "
-            "dependencies the way it does there. Install it, or set "
-            "MINIMUM_SUPPORTED_PYTHON_INTERPRETER to that "
-            "interpreter.".format(interpreter_name),
-            file=stderr)
-        return 1
-
     build_directory = Path(
         environ.get("BUILD_DIR", str(_REPOSITORY_ROOT / "build")))
     venv_directory = (
@@ -356,16 +371,11 @@ def prepare_payload_and_rerun_in_the_virtualenv(
     build_directory.mkdir(parents=True, exist_ok=True)
     pinned_requirements_path.write_text(
         "\n".join(pinned_requirements) + "\n", encoding="utf-8")
-    rmtree(payload_directory, ignore_errors=True)
-
     venv_python = str(venv_directory / "bin" / "python")
     for command in (
-            [interpreter, "-m", "venv", "--clear", str(venv_directory)],
+            [executable, "-m", "venv", "--clear", str(venv_directory)],
             [venv_python, "-m", "pip", "install", "--quiet",
-             "packaging", "tomli"],
-            [venv_python, "-m", "pip", "install", "--quiet",
-             "--target", str(payload_directory),
-             "-r", str(pinned_requirements_path)]):
+             "packaging", "tomli"]):
         try:
             run(command, check=True)
         except CalledProcessError as error:
@@ -375,9 +385,41 @@ def prepare_payload_and_rerun_in_the_virtualenv(
                 file=stderr)
             return error.returncode
 
+    lowest_resolvable_python_version: tuple[int, int] | None = None
+    for python_version in sorted(supported_python_versions):
+        rmtree(payload_directory, ignore_errors=True)
+        resolution = run([
+            venv_python, "-m", "pip", "install", "--quiet",
+            "--target", str(payload_directory),
+            "--python-version", "{}.{}".format(*python_version),
+            "--only-binary=:all:",
+            "-r", str(pinned_requirements_path)])
+        if resolution.returncode == 0:
+            lowest_resolvable_python_version = python_version
+            break
+        print(
+            "note: pip cannot resolve {} for Python {}.{}, so the package "
+            "can no longer be built for it".format(
+                pinned_requirements_path.name, *python_version),
+            file=stderr)
+
+    if lowest_resolvable_python_version is None:
+        print(
+            "error: pip cannot resolve {} for any supported Python version "
+            "({}). Every supported Python version would have to be dropped, "
+            "which would leave {} empty, so this needs a pin reverted or a "
+            "newer interpreter added by hand.".format(
+                pinned_requirements_path.name,
+                format_python_versions(sorted(supported_python_versions)),
+                SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
+            file=stderr)
+        return 1
+
     return run([
         venv_python, script_path,
         "--payload-dir", str(payload_directory),
         "--vendor-dir", arguments.vendor_dir,
+        "--lowest-resolvable-python-version",
+        "{}.{}".format(*lowest_resolvable_python_version),
         "--supported-python-versions-file",
         arguments.supported_python_versions_file]).returncode

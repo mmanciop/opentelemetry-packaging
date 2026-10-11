@@ -6,8 +6,7 @@
 The supported Python versions and the minimum required Python version are
 defined in the module docstring of shared.py, next to this script, which is
 the only place either term is defined. That docstring also documents the two
-phases this script runs in and the environment variables
-MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR.
+phases this script runs in and the environment variable BUILD_DIR.
 
 This script only ever removes entries from
 packaging/builder/supported_python_versions.json. Adding an interpreter to
@@ -68,7 +67,7 @@ def main() -> int:
 
     if arguments.payload_dir is None:
         return prepare_payload_and_rerun_in_the_virtualenv(
-            __file__, min(supported_python_versions), arguments)
+            __file__, supported_python_versions, arguments)
 
     try:
         minimum_required_python_version = (
@@ -77,6 +76,11 @@ def main() -> int:
     except MinimumRequiredPythonVersionError as error:
         print(error, file=stderr)
         return 1
+
+    if arguments.lowest_resolvable_python_version is not None:
+        minimum_required_python_version = max(
+            minimum_required_python_version,
+            arguments.lowest_resolvable_python_version)
 
     print("minimum required Python version: {}.{}".format(
         *minimum_required_python_version))

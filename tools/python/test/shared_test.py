@@ -75,18 +75,26 @@ def run_payload_script(
     payload_directory: Path,
     vendor_directory: Path,
     supported_python_versions_path: Path,
+    lowest_resolvable_python_version: str | None = None,
 ) -> CompletedProcess[str]:
     """Run a payload script's work phase and return the completed run.
 
     Passing --payload-dir selects the work phase directly, so no virtualenv
-    is built and no distribution is downloaded.
+    is built and no distribution is downloaded. Passing
+    lowest_resolvable_python_version stands in for what the preparation phase
+    would have found, so the versions pip could not resolve can be exercised
+    without resolving anything.
     """
-    return run(
-        [
-            executable, script_path,
-            "--payload-dir", str(payload_directory),
-            "--vendor-dir", str(vendor_directory),
-            "--supported-python-versions-file",
-            str(supported_python_versions_path),
-        ],
-        capture_output=True, text=True)
+    command: list[str] = [
+        executable, script_path,
+        "--payload-dir", str(payload_directory),
+        "--vendor-dir", str(vendor_directory),
+        "--supported-python-versions-file",
+        str(supported_python_versions_path),
+    ]
+    if lowest_resolvable_python_version is not None:
+        command += [
+            "--lowest-resolvable-python-version",
+            lowest_resolvable_python_version,
+        ]
+    return run(command, capture_output=True, text=True)
