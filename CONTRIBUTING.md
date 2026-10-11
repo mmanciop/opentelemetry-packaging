@@ -83,7 +83,8 @@ The `cmd/build-packages` program:
 
    `sitecustomize.py` therefore has to know which interpreters the bundle actually carries, and it does not derive that from a minimum version.
    The compiled extensions are each built against a single CPython ABI, and `rpds-py` has no pure-Python fallback, so an interpreter newer than every one in the bundle has no working copy of it there.
-   The builder writes the set it resolved into the script by replacing the `_SUPPORTED_PYTHON_MINORS` line marked with the `supported-python-minors` comment, and the script's version gate is a membership test against that set.
+   The builder writes the set it resolved into the script by replacing the module-level `supported_python_versions` line marked with the `supported-python-versions` comment, and the script's version gate is a membership test against that list.
+   The list holds the same `"3.10"`-style strings as the JSON, in the same order, so the two can be compared as they stand.
    Change `packaging/builder/supported_python_versions.json` and the gate follows; never edit that line by hand.
 
 2. **Constructs an `nfpm.Info`** for each component with the correct metadata:
