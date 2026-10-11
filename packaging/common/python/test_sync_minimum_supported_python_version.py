@@ -19,8 +19,9 @@ from sync_minimum_supported_python_version import (
 _TOOL_PATH = str(
     Path(__file__).with_name("sync_minimum_supported_python_version.py"))
 
-_SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE = Path(__file__).parents[2] / "builder" / (
-    "supported_python_versions.json")
+_SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE = (
+    Path(__file__).parents[2] / "builder"
+    / "supported_python_versions.json")
 
 _FOUR_SUPPORTED_PYTHON_VERSIONS_JSON = '["3.10", "3.11", "3.12", "3.13"]\n'
 
@@ -44,23 +45,67 @@ def write_dist_info_with_requires_python(
         encoding="utf-8")
 
 
-def write_supported_python_versions_file(supported_python_versions_path, versions):
+def write_supported_python_versions_file(
+        supported_python_versions_path, versions):
     """Write a versions file listing the given "major.minor" strings."""
     supported_python_versions_path.write_text(
         dumps(list(versions)) + "\n", encoding="utf-8")
 
 
 def run_sync_minimum_supported_python_version(
-        mode, payload_directory, vendor_directory, supported_python_versions_path):
-    """Run the tool in --check or --write mode and return the completed run."""
+        mode, payload_directory, vendor_directory,
+        supported_python_versions_path):
+    """Run the tool in --check or --write mode and return the completed run.
+
+    Passing --payload-dir selects the work phase directly, so no virtualenv is
+    built and no distribution is downloaded.
+    """
     return run(
         [
             executable, _TOOL_PATH, mode,
             "--payload-dir", str(payload_directory),
             "--vendor-dir", str(vendor_directory),
-            "--supported-python-versions-file", str(supported_python_versions_path),
+            "--supported-python-versions-file",
+            str(supported_python_versions_path),
         ],
         capture_output=True, text=True)
+
+
+class TestPrintMinimumSupportedPythonVersion(TestCase):
+
+    def test_prints_the_lowest_entry_and_needs_no_payload(self):
+        # CI runs this before any interpreter is installed, to decide which
+        # one to install, so it must work without a virtualenv or a payload.
+        with TemporaryDirectory() as temporary_directory:
+            supported_python_versions_path = (
+                Path(temporary_directory) / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.11", "3.12", "3.10"])
+
+            completed = run(
+                [
+                    executable, _TOOL_PATH,
+                    "--print-minimum-supported-python-version",
+                    "--supported-python-versions-file",
+                    str(supported_python_versions_path),
+                ],
+                capture_output=True, text=True)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual("3.10", completed.stdout.strip())
+
+    def test_the_shipped_file_prints_the_version_the_workflow_installs(self):
+        completed = run(
+            [executable, _TOOL_PATH,
+             "--print-minimum-supported-python-version"],
+            capture_output=True, text=True)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(
+            "{}.{}".format(*min(read_supported_python_versions(
+                _SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE.read_text(
+                    encoding="utf-8")))),
+            completed.stdout.strip())
 
 
 class TestDeriveFloorFromRequiresPython(TestCase):
@@ -89,7 +134,8 @@ class TestDeriveFloorFromRequiresPython(TestCase):
 
 class TestPayloadScopedEnumeration(TestCase):
 
-    def test_minimum_required_python_version_comes_only_from_the_payload_directory(self):
+    def test_minimum_required_python_version_comes_only_from_the_payload_directory(
+            self):
         # The payload declares a single distribution at >=3.7, so the
         # minimum required Python version is 3.7. The interpreter running
         # this test has packaging installed (>=3.9), plus pip and
@@ -105,8 +151,10 @@ class TestPayloadScopedEnumeration(TestCase):
                 payload_directory, "shipped_thing", "1.0", ">=3.7")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
-            write_supported_python_versions_file(supported_python_versions_path, ["3.7", "3.8"])
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.7", "3.8"])
 
             completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
@@ -115,7 +163,8 @@ class TestPayloadScopedEnumeration(TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("minimum required Python version: 3.7", completed.stdout)
 
-    def test_strictest_payload_distribution_decides_the_minimum_required_python_version(self):
+    def test_strictest_payload_distribution_decides_the_minimum_required_python_version(
+            self):
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -125,8 +174,10 @@ class TestPayloadScopedEnumeration(TestCase):
                 payload_directory, "strict_thing", "2.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
-            write_supported_python_versions_file(supported_python_versions_path, ["3.11", "3.12"])
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.11", "3.12"])
 
             completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
@@ -149,8 +200,10 @@ class TestPayloadScopedEnumeration(TestCase):
                 'name = "some-package"\n'
                 'requires-python = ">=3.10"\n',
                 encoding="utf-8")
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
-            write_supported_python_versions_file(supported_python_versions_path, ["3.10"])
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.10"])
 
             completed = run_sync_minimum_supported_python_version(
                 "--check", temporary_path / "no-such-payload",
@@ -166,8 +219,10 @@ class TestPayloadScopedEnumeration(TestCase):
             payload_directory.mkdir()
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
-            write_supported_python_versions_file(supported_python_versions_path, ["3.10"])
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.10"])
 
             completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
@@ -197,7 +252,8 @@ class TestVendorPyprojectParsing(TestCase):
                 'name = "some-package"\n'
                 'requires-python = ">=3.12"\n',
                 encoding="utf-8")
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
@@ -213,7 +269,8 @@ class TestSupportedVersionsReadAndPrune(TestCase):
 
     def test_read_supported_python_versions_from_the_json_array(self):
         self.assertEqual(
-            read_supported_python_versions(_FOUR_SUPPORTED_PYTHON_VERSIONS_JSON),
+            read_supported_python_versions(
+                _FOUR_SUPPORTED_PYTHON_VERSIONS_JSON),
             [(3, 10), (3, 11), (3, 12), (3, 13)])
 
     def test_read_malformed_json_raises(self):
@@ -234,33 +291,41 @@ class TestSupportedVersionsReadAndPrune(TestCase):
                 with self.assertRaises(ValueError):
                     read_supported_python_versions("[{}]".format(entry))
 
-    def test_prune_drops_only_the_supported_python_versions_below_the_minimum_required_python_version(self):
-        pruned = prune_supported_python_versions(_FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, (3, 12))
+    def test_prune_drops_only_the_supported_python_versions_below_the_minimum_required_python_version(
+            self):
+        pruned = prune_supported_python_versions(
+            _FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, (3, 12))
         self.assertEqual(loads(pruned), ["3.12", "3.13"])
-        self.assertEqual(read_supported_python_versions(pruned), [(3, 12), (3, 13)])
+        self.assertEqual(
+            read_supported_python_versions(pruned), [(3, 12), (3, 13)])
 
     def test_prune_output_matches_the_shipped_file_formatting(self):
         # The pruned text is written back over the file the Go builder embeds,
         # so a --write run must not reformat it into something a reviewer sees
         # as an unrelated change.
         self.assertEqual(
-            prune_supported_python_versions(_FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, (3, 9)),
-            _SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE.read_text(encoding="utf-8"))
+            prune_supported_python_versions(
+                _FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, (3, 9)),
+            _SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE.read_text(
+                encoding="utf-8"))
 
     def test_prune_below_every_supported_python_version_changes_nothing(self):
         self.assertEqual(
             read_supported_python_versions(
-                prune_supported_python_versions(_FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, (3, 9))),
+                prune_supported_python_versions(
+                    _FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, (3, 9))),
             [(3, 10), (3, 11), (3, 12), (3, 13)])
 
     def test_prune_that_would_empty_the_list_raises(self):
         with self.assertRaises(ValueError):
-            prune_supported_python_versions(_FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, (3, 99))
+            prune_supported_python_versions(
+                _FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, (3, 99))
 
 
 class TestCheckAndWriteEndToEnd(TestCase):
 
-    def test_check_passes_when_every_supported_python_version_meets_the_minimum_required_python_version(self):
+    def test_check_passes_when_every_supported_python_version_meets_the_minimum_required_python_version(
+            self):
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -268,8 +333,10 @@ class TestCheckAndWriteEndToEnd(TestCase):
                 payload_directory, "shipped_thing", "1.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
-            write_supported_python_versions_file(supported_python_versions_path, ["3.11", "3.12"])
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.11", "3.12"])
 
             completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
@@ -278,7 +345,8 @@ class TestCheckAndWriteEndToEnd(TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("are in sync", completed.stdout)
 
-    def test_check_fails_when_a_supported_python_version_is_below_the_minimum_required_python_version(self):
+    def test_check_fails_when_a_supported_python_version_is_below_the_minimum_required_python_version(
+            self):
         # This is the regression the check exists for: a dependency bump
         # raises the minimum to 3.11 while the builder still tries to resolve
         # the payload for 3.10, which pip cannot do.
@@ -289,7 +357,8 @@ class TestCheckAndWriteEndToEnd(TestCase):
                 payload_directory, "shipped_thing", "1.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
@@ -313,8 +382,10 @@ class TestCheckAndWriteEndToEnd(TestCase):
                 payload_directory, "shipped_thing", "1.0", ">=3.8")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
-            write_supported_python_versions_file(supported_python_versions_path, ["3.10", "3.11"])
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.10", "3.11"])
 
             completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
@@ -323,7 +394,8 @@ class TestCheckAndWriteEndToEnd(TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("would also permit 3.8", completed.stdout)
 
-    def test_write_drops_the_supported_python_versions_below_the_minimum_required_python_version(self):
+    def test_write_drops_the_supported_python_versions_below_the_minimum_required_python_version(
+            self):
         # A vendored pyproject requiring 3.12, above the payload's 3.10, puts
         # the minimum required Python version at 3.12, so --write must drop
         # keep the rest.
@@ -339,7 +411,8 @@ class TestCheckAndWriteEndToEnd(TestCase):
                 'name = "high-requirement"\n'
                 'requires-python = ">=3.12"\n',
                 encoding="utf-8")
-            supported_python_versions_path = temporary_path / "supported_python_versions.json"
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
             supported_python_versions_path.write_text(
                 _FOUR_SUPPORTED_PYTHON_VERSIONS_JSON, encoding="utf-8")
 
@@ -348,6 +421,7 @@ class TestCheckAndWriteEndToEnd(TestCase):
                 supported_python_versions_path)
             self.assertEqual(completed.returncode, 0, completed.stderr)
 
-            rewritten = supported_python_versions_path.read_text(encoding="utf-8")
+            rewritten = supported_python_versions_path.read_text(
+                encoding="utf-8")
 
         self.assertEqual(loads(rewritten), ["3.12", "3.13"])

@@ -45,6 +45,35 @@ Minimum required Python version
 What this script does with the two
     --check fails when a supported Python version is below the minimum
     required Python version, and --write drops those versions.
+    --print-minimum-supported-python-version prints the minimum supported
+    Python version and exits, which is how CI decides which interpreter to
+    install before running the check.
+
+This file runs in two phases, in two different interpreters.
+
+The preparation phase runs under whatever python3 invoked the file. It builds
+a virtualenv with the interpreter for the minimum supported Python version,
+installs this tool's own dependencies into it, installs the PyPI pins from
+requirements.txt into a payload directory with "pip install --target", and
+then re-invokes this same file with that interpreter and --payload-dir.
+MINIMUM_SUPPORTED_PYTHON_INTERPRETER overrides the interpreter it looks for,
+and BUILD_DIR overrides where the virtualenv and the payload are written
+(default: build/ at the repository root, which "make clean" removes).
+
+The work phase is the re-invocation. It runs inside that virtualenv, where
+packaging and tomli are importable, and it does the derivation and the
+check or the prune. Passing --payload-dir directly selects this phase without
+any preparation, which is what the unit tests do.
+
+The virtualenv is built with the interpreter for the minimum supported Python
+version on purpose: its pip must resolve the payload's transitive dependencies
+the way it would on that version, so a newer release of a transitive
+dependency that raised its own Requires-Python does not inflate the minimum
+required Python version above what actually runs there.
+
+The vendored requires-python values are read straight from each vendor
+pyproject.toml under --vendor-dir, so the vendored source never has to be
+built for the check.
 
 A supported Python version below the minimum required Python version is an
 error: pip cannot resolve the payload for an interpreter the bundled
@@ -59,15 +88,15 @@ source is what lets this tool read and rewrite them with a JSON parser.
 Extracting a Go slice literal with a regular expression cannot tell a live
 entry from one inside a // comment.
 
-The payload directory named by --payload-dir is the directory that a
-"pip install --target" of requirements.txt produces, which is what
-packaging/builder/download.go writes into the DEB and the RPM. Scoping the
-enumeration to that directory keeps distributions that never ship out of the
-derivation: pip and setuptools, which "python -m venv" creates in any
-surrounding virtualenv, and tomli, which only this tool imports. Since the
+The payload directory holds what a "pip install --target" of requirements.txt
+produces, which is what packaging/builder/download.go writes into the DEB and
+the RPM. Scoping the enumeration to that directory keeps distributions that
+never ship out of the derivation: pip and setuptools, which "python -m venv"
+creates in the virtualenv, and tomli, which only this tool imports. Since the
 minimum required Python version is a maximum, a distribution that does not
 ship can only raise it and never lower it, so including one would mask a value
-that should drop while --check still reported the list as in sync.
+that should drop while --check still reported the list as in sync. That is
+why the payload is installed with --target rather than into the virtualenv.
 
 This tool only handles 3.x interpreters. If the minimum required Python
 version has a major version other than 3, it exits with an error asking for a
@@ -77,21 +106,17 @@ refactor.
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from importlib.metadata import distributions
 from json import JSONDecodeError, dumps, loads
+from os import environ
 from os.path import dirname, join
 from pathlib import Path
+from shutil import rmtree, which
+from subprocess import CalledProcessError, run
 from sys import stderr
 
-from packaging.specifiers import SpecifierSet
-from packaging.version import Version
-
-# tomllib is standard library since Python 3.11. This tool must also run under
-# the current 3.10 minimum (so pip resolves transitive dependencies exactly as
-# it would on that interpreter), where tomllib is absent and the tomli
-# backport is installed alongside packaging instead.
-try:
-    from tomllib import load
-except ModuleNotFoundError:
-    from tomli import load
+# packaging and tomli are imported where they are used rather than here,
+# because the preparation phase runs under whatever python3 invoked this file
+# and neither is installed there. Only the work phase, which runs inside the
+# virtualenv the preparation phase builds, can import them.
 
 # The lowest major.minor pairs we scan when probing a specifier for the lowest
 # version it admits. Python 3 minors are the realistic range for this project;
@@ -114,6 +139,9 @@ def derive_minimum_required_python_version(
     ignored, because a distribution that declares no Requires-Python
     constrains nothing. Returns None when no item constrains anything.
     """
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import Version
+
     per_specifier_minimums = []
     for requires_python in requires_python_strings:
         if not requires_python:
@@ -207,10 +235,12 @@ def main():
              "(default: the one in this repository)")
     argument_parser.add_argument(
         "--payload-dir",
-        required=True,
+        default=None,
         help="directory holding the distributions that ship in the package, "
              "as produced by pip install --target; only the distributions "
-             "found there contribute to the minimum required Python version")
+             "found there contribute to the minimum required Python version. "
+             "Omit it to run the preparation phase, which builds the payload "
+             "and then re-invokes this file with the directory it built")
     argument_parser.add_argument(
         "--vendor-dir",
         default=join(script_directory, "vendor"),
@@ -227,7 +257,86 @@ def main():
         action="store_true",
         help="drop the supported Python versions below the minimum "
              "required Python version")
+    mode_group.add_argument(
+        "--print-minimum-supported-python-version",
+        action="store_true",
+        help="print the minimum supported Python version as major.minor and "
+             "exit; needs no virtualenv and no payload, so CI can use it to "
+             "decide which interpreter to install")
     arguments = argument_parser.parse_args()
+
+    with open(arguments.supported_python_versions_file,
+              encoding="utf-8") as supported_python_versions_file:
+        supported_python_versions_text = supported_python_versions_file.read()
+    supported_python_versions = read_supported_python_versions(
+        supported_python_versions_text)
+    minimum_supported_python_version = min(supported_python_versions)
+
+    if arguments.print_minimum_supported_python_version:
+        print("{}.{}".format(*minimum_supported_python_version))
+        return 0
+
+    if arguments.payload_dir is None:
+        interpreter_name = environ.get(
+            "MINIMUM_SUPPORTED_PYTHON_INTERPRETER",
+            "python{}.{}".format(*minimum_supported_python_version))
+        interpreter = which(interpreter_name)
+        if interpreter is None:
+            print(
+                "error: {} is not installed. The minimum required Python "
+                "version must be derived with the interpreter for the "
+                "minimum supported Python version, so that pip resolves "
+                "transitive dependencies the way it does there. Install it, "
+                "or set MINIMUM_SUPPORTED_PYTHON_INTERPRETER to that "
+                "interpreter.".format(interpreter_name),
+                file=stderr)
+            return 1
+
+        repository_root = Path(script_directory).resolve().parents[2]
+        build_directory = Path(
+            environ.get("BUILD_DIR", str(repository_root / "build")))
+        venv_directory = (
+            build_directory / "minimum-supported-python-version-venv")
+        payload_directory = (
+            build_directory / "minimum-supported-python-version-payload")
+        pinned_requirements_path = (
+            build_directory
+            / "minimum-supported-python-version-requirements.txt")
+
+        with open(join(script_directory, "requirements.txt"),
+                  encoding="utf-8") as requirements_file:
+            pinned_requirements = [
+                line for line in requirements_file.read().splitlines()
+                if not line.startswith("./vendor/")]
+        build_directory.mkdir(parents=True, exist_ok=True)
+        pinned_requirements_path.write_text(
+            "\n".join(pinned_requirements) + "\n", encoding="utf-8")
+        rmtree(payload_directory, ignore_errors=True)
+
+        venv_python = str(venv_directory / "bin" / "python")
+        for command in (
+                [interpreter, "-m", "venv", "--clear", str(venv_directory)],
+                [venv_python, "-m", "pip", "install", "--quiet",
+                 "packaging", "tomli"],
+                [venv_python, "-m", "pip", "install", "--quiet",
+                 "--target", str(payload_directory),
+                 "-r", str(pinned_requirements_path)]):
+            try:
+                run(command, check=True)
+            except CalledProcessError as error:
+                print(
+                    "error: preparation step failed with exit status {}: "
+                    "{}".format(error.returncode, " ".join(command)),
+                    file=stderr)
+                return error.returncode
+
+        return run([
+            venv_python, __file__,
+            "--check" if arguments.check else "--write",
+            "--payload-dir", str(payload_directory),
+            "--vendor-dir", arguments.vendor_dir,
+            "--supported-python-versions-file",
+            arguments.supported_python_versions_file]).returncode
 
     # Collect Requires-Python from every shipped distribution, then from every
     # vendored pyproject.toml. The enumeration is scoped to the payload
@@ -249,7 +358,12 @@ def main():
     requires_python_strings = [
         distribution.metadata["Requires-Python"]
         for distribution in shipped_distributions]
-    for pyproject_path in Path(arguments.vendor_dir).rglob("pyproject.toml"):
+    try:
+        from tomllib import load
+    except ModuleNotFoundError:
+        from tomli import load
+    for pyproject_path in Path(arguments.vendor_dir).rglob(
+            "pyproject.toml"):
         with open(pyproject_path, "rb") as pyproject_file:
             pyproject_data = load(pyproject_file)
         requires_python_strings.append(
@@ -277,11 +391,6 @@ def main():
             file=stderr)
         return 1
 
-    with open(arguments.supported_python_versions_file,
-              encoding="utf-8") as supported_python_versions_file:
-        supported_python_versions_text = supported_python_versions_file.read()
-    supported_python_versions = read_supported_python_versions(
-        supported_python_versions_text)
     below_minimum_required_python_version = [
         version for version in supported_python_versions
         if version < minimum_required_python_version]
