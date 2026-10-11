@@ -46,8 +46,9 @@ jobs:
       - name: Resolve the minimum supported Python from the builder
         id: minimum_python
         run: |
-          version="$(grep '^var supportedPythonVersions' packaging/builder/download.go \
-            | grep -o '"[0-9]\{1,\}\.[0-9]\{1,\}"' | tr -d '"' | sort -V | head -1)"
+          version="$(grep -o '"[0-9]\{1,\}\.[0-9]\{1,\}"' \
+            packaging/builder/supported_python_versions.json \
+            | tr -d '"' | sort -V | head -1)"
           test -n "${version}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 

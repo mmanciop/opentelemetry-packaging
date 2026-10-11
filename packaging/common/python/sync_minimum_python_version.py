@@ -9,14 +9,19 @@ and every vendored package's pyproject.toml. This script derives that floor and
 either checks it against the interpreter list the builder resolves wheels for
 (--check) or prunes that list to match (--write).
 
-The list lives in packaging/builder/download.go:
+The list lives in packaging/builder/supported_python_versions.json:
 
-    var supportedPythonVersions = []string{"3.10", "3.11", "3.12", "3.13"}
+    ["3.10", "3.11", "3.12", "3.13"]
 
-The builder resolves and installs the payload once per entry, and writes the
-same set into the sitecustomize.py version gate, so this list is the single
-hand-maintained statement of which interpreters the package supports. The gate
-itself is generated from it and must not be edited directly.
+packaging/builder/download.go embeds that file, the builder resolves and
+installs the payload once per entry, and it writes the same set into the
+sitecustomize.py version gate, so this file is the single hand-maintained
+statement of which interpreters the package supports. The gate itself is
+generated from it and must not be edited directly.
+
+Keeping the list in a data file rather than in the Go source is what lets this
+tool read and rewrite it with a JSON parser. Extracting a Go slice literal with
+a regular expression cannot tell a live entry from one inside a // comment.
 
 An entry below the derived floor is an error: pip cannot resolve the payload for
 an interpreter the bundled distributions reject, so the build either fails or
@@ -42,9 +47,9 @@ derived major is not 3, it exits with an error asking for a refactor.
 
 from argparse import ArgumentParser
 from importlib.metadata import distributions
+from json import JSONDecodeError, dumps, loads
 from os.path import dirname, join
 from pathlib import Path
-from re import compile as re_compile
 from sys import stderr
 
 from packaging.specifiers import SpecifierSet
@@ -67,10 +72,7 @@ _CANDIDATE_VERSIONS = [(3, minor) for minor in range(0, 31)] + [
     (4, minor) for minor in range(0, 31)
 ]
 
-_SUPPORTED_VERSIONS_PATTERN = re_compile(
-    r"var supportedPythonVersions = \[\]string\{([^}]*)\}")
-
-_VERSION_LITERAL_PATTERN = re_compile(r'"(\d+)\.(\d+)"')
+_VERSIONS_FILE_NAME = "supported_python_versions.json"
 
 
 def lowest_supported_major_minor_across_requires_python(
@@ -101,43 +103,52 @@ def lowest_supported_major_minor_across_requires_python(
     return max(per_specifier_minimums)
 
 
-def read_supported_versions(builder_text):
-    """Return the (major, minor) pairs listed in supportedPythonVersions.
+def read_supported_versions(versions_text):
+    """Return the (major, minor) pairs listed in the supported versions file.
 
-    Takes the text of packaging/builder/download.go. Raises ValueError if the
-    declaration is absent, appears more than once, or lists no version.
+    Takes the text of packaging/builder/supported_python_versions.json, which
+    holds a JSON array of "major.minor" strings. Raises ValueError if the
+    document is not such an array or lists no version.
     """
-    declarations = _SUPPORTED_VERSIONS_PATTERN.findall(builder_text)
-    if len(declarations) != 1:
+    try:
+        parsed = loads(versions_text)
+    except JSONDecodeError as error:
         raise ValueError(
-            "expected exactly 1 supportedPythonVersions declaration in "
-            "download.go, found {}".format(len(declarations)))
-    versions = [
-        (int(major), int(minor))
-        for major, minor in _VERSION_LITERAL_PATTERN.findall(declarations[0])]
-    if not versions:
-        raise ValueError("supportedPythonVersions lists no version")
+            "{} is not valid JSON: {}".format(
+                _VERSIONS_FILE_NAME, error)) from error
+    if not isinstance(parsed, list):
+        raise ValueError(
+            "{} must hold a JSON array, found {}".format(
+                _VERSIONS_FILE_NAME, type(parsed).__name__))
+    if not parsed:
+        raise ValueError("{} lists no version".format(_VERSIONS_FILE_NAME))
+    versions = []
+    for entry in parsed:
+        major, _, minor = entry.partition(".") if isinstance(
+            entry, str) else ("", "", "")
+        if not major.isdigit() or not minor.isdigit():
+            raise ValueError(
+                '{} entries must be strings like "3.10", found {!r}'.format(
+                    _VERSIONS_FILE_NAME, entry))
+        versions.append((int(major), int(minor)))
     return versions
 
 
-def prune_supported_versions(builder_text, floor):
-    """Return download.go text with the versions below floor removed.
+def prune_supported_versions(versions_text, floor):
+    """Return supported versions JSON with the versions below floor removed.
 
     floor is a (major, minor) pair. Raises ValueError if pruning would empty
     the list, which would mean no interpreter the builder knows about can run
     the bundled distributions at all.
     """
     kept = [
-        version for version in read_supported_versions(builder_text)
+        version for version in read_supported_versions(versions_text)
         if version >= floor]
     if not kept:
         raise ValueError(
-            "pruning to the derived floor {}.{} would empty "
-            "supportedPythonVersions".format(*floor))
-    replacement = "var supportedPythonVersions = []string{{{}}}".format(
-        ", ".join('"{}.{}"'.format(*version) for version in kept))
-    return _SUPPORTED_VERSIONS_PATTERN.sub(
-        lambda _: replacement, builder_text, count=1)
+            "pruning to the derived floor {}.{} would empty {}".format(
+                *floor, _VERSIONS_FILE_NAME))
+    return dumps(["{}.{}".format(*version) for version in kept]) + "\n"
 
 
 def format_versions(versions):
@@ -149,10 +160,11 @@ def main():
     argument_parser = ArgumentParser(description=__doc__)
     script_directory = dirname(__file__)
     argument_parser.add_argument(
-        "--download-go",
+        "--versions-file",
         default=join(
-            script_directory, "..", "..", "builder", "download.go"),
-        help="path to download.go, which declares supportedPythonVersions "
+            script_directory, "..", "..", "builder", _VERSIONS_FILE_NAME),
+        help="path to the JSON array of supported interpreters that "
+             "packaging/builder/download.go embeds "
              "(default: the one in this repository)")
     argument_parser.add_argument(
         "--payload-dir",
@@ -213,32 +225,31 @@ def main():
     derived_major, derived_minor = derived_floor
     if derived_major != 3:
         print(
-            "derived minimum Python major is {}, not 3; "
-            "supportedPythonVersions and the sitecustomize.py gate only "
-            "support 3.x and must be updated for major-version bumps".format(
-                derived_major),
+            "derived minimum Python major is {}, not 3; {} and the "
+            "sitecustomize.py gate only support 3.x and must be updated for "
+            "major-version bumps".format(
+                derived_major, _VERSIONS_FILE_NAME),
             file=stderr)
         return 1
 
-    with open(arguments.download_go, encoding="utf-8") as builder_file:
-        builder_text = builder_file.read()
-    supported_versions = read_supported_versions(builder_text)
+    with open(arguments.versions_file, encoding="utf-8") as versions_file:
+        versions_text = versions_file.read()
+    supported_versions = read_supported_versions(versions_text)
     below_floor = [
         version for version in supported_versions if version < derived_floor]
 
     print("derived minimum Python: {}.{}".format(derived_major, derived_minor))
-    print("supportedPythonVersions: {}".format(
+    print("supported Python versions: {}".format(
         format_versions(supported_versions)))
 
     if arguments.check:
         if below_floor:
             print(
-                "supportedPythonVersions lists {} below the derived floor "
-                "{}.{}; pip cannot resolve the payload for those "
-                "interpreters. Run sync_minimum_python_version.py --write to "
-                "drop them.".format(
-                    format_versions(below_floor), derived_major,
-                    derived_minor),
+                "{} lists {} below the derived floor {}.{}; pip cannot "
+                "resolve the payload for those interpreters. Run "
+                "sync_minimum_python_version.py --write to drop them.".format(
+                    _VERSIONS_FILE_NAME, format_versions(below_floor),
+                    derived_major, derived_minor),
                 file=stderr)
             return 1
         if min(supported_versions) > derived_floor:
@@ -246,17 +257,17 @@ def main():
                 "note: the bundled distributions would also permit {}.{}, "
                 "which the package does not ship".format(
                     derived_major, derived_minor))
-        print("supportedPythonVersions is in sync")
+        print("supported Python versions are in sync")
         return 0
 
     if not below_floor:
         print("no supported interpreter is below the floor; nothing to prune")
         return 0
-    pruned_text = prune_supported_versions(builder_text, derived_floor)
-    with open(arguments.download_go, "w", encoding="utf-8") as builder_file:
-        builder_file.write(pruned_text)
-    print("dropped {} from supportedPythonVersions".format(
-        format_versions(below_floor)))
+    pruned_text = prune_supported_versions(versions_text, derived_floor)
+    with open(arguments.versions_file, "w", encoding="utf-8") as versions_file:
+        versions_file.write(pruned_text)
+    print("dropped {} from {}".format(
+        format_versions(below_floor), _VERSIONS_FILE_NAME))
     return 0
 
 

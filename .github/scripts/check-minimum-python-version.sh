@@ -3,8 +3,9 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-# Keep supportedPythonVersions in packaging/builder/download.go in sync with
-# the strictest Requires-Python across the distributions that actually ship.
+# Keep packaging/builder/supported_python_versions.json, the JSON array
+# packaging/builder/download.go embeds, in sync with the strictest
+# Requires-Python across the distributions that actually ship.
 #
 # Usage: check-minimum-python-version.sh [--check|--write]
 #
@@ -15,7 +16,7 @@
 # Environment:
 #
 #   MINIMUM_PYTHON  Interpreter that derives the floor (default: the lowest
-#                   version in supportedPythonVersions, as pythonX.Y).
+#                   version in the supported versions file, as pythonX.Y).
 #   BUILD_DIR       Scratch directory for the venv and the payload
 #                   (default: build/ at the repository root, removed by
 #                   "make clean").
@@ -32,8 +33,8 @@
 # The vendored floor is read straight from each vendor pyproject.toml via
 # --vendor-dir, so the vendored source does not need to be built for the check.
 #
-# The venv that runs the tool is built with the lowest interpreter in
-# supportedPythonVersions on purpose: its pip must resolve the payload's
+# The venv that runs the tool is built with the lowest supported interpreter
+# on purpose: its pip must resolve the payload's
 # transitive dependencies the way it would on that version, so a newer release
 # of a transitive dependency that raised its own Requires-Python does not
 # inflate the derived floor above what actually runs on the lowest supported
@@ -53,14 +54,14 @@ esac
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PYTHON_DIR="${REPO_ROOT}/packaging/common/python"
-DOWNLOAD_GO="${REPO_ROOT}/packaging/builder/download.go"
+VERSIONS_FILE="${REPO_ROOT}/packaging/builder/supported_python_versions.json"
 
 MINIMUM_PYTHON_VERSION="$(
-    grep '^var supportedPythonVersions' "${DOWNLOAD_GO}" \
-        | grep -o '"[0-9]\{1,\}\.[0-9]\{1,\}"' | tr -d '"' | sort -V | head -1
+    grep -o '"[0-9]\{1,\}\.[0-9]\{1,\}"' "${VERSIONS_FILE}" \
+        | tr -d '"' | sort -V | head -1
 )"
 if [ -z "${MINIMUM_PYTHON_VERSION}" ]; then
-    echo "error: could not read supportedPythonVersions from ${DOWNLOAD_GO}" >&2
+    echo "error: could not read any version from ${VERSIONS_FILE}" >&2
     exit 1
 fi
 MINIMUM_PYTHON="${MINIMUM_PYTHON:-python${MINIMUM_PYTHON_VERSION}}"
@@ -88,4 +89,4 @@ grep -v '^\./vendor/' "${PYTHON_DIR}/requirements.txt" \
     "${MODE}" \
     --payload-dir "${PAYLOAD_DIR}" \
     --vendor-dir "${PYTHON_DIR}/vendor" \
-    --download-go "${DOWNLOAD_GO}"
+    --versions-file "${VERSIONS_FILE}"
