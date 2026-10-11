@@ -9,9 +9,10 @@ so that there is exactly one place to correct if any of them changes.
 
 Supported Python versions
     The Python versions the package is built for, listed in
-    packaging/builder/supported_python_versions.json:
-
-        ["3.10", "3.11", "3.12", "3.13"]
+    packaging/builder/supported_python_versions.json as a JSON array of
+    "major.minor" strings. Read that file for the current list. It is not
+    repeated here, nor in any test, so that editing it cannot leave a second
+    copy naming interpreters the package no longer ships.
 
     A person maintains that list by hand. packaging/builder/download.go
     embeds it, the builder resolves and installs the payload once per entry,
@@ -21,7 +22,8 @@ Supported Python versions
     directly.
 
 Minimum supported Python version
-    The lowest of the supported Python versions. Currently 3.10.
+    The lowest of the supported Python versions.
+    print-minimum-supported-python-version.py prints it.
 
 Minimum required Python version
     The maximum, over every distribution the package bundles, of the lowest

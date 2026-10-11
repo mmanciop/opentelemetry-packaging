@@ -26,8 +26,6 @@ SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE = (
     Path(__file__).parents[2] / "builder"
     / "supported_python_versions.json")
 
-FOUR_SUPPORTED_PYTHON_VERSIONS_JSON = '["3.10", "3.11", "3.12", "3.13"]\n'
-
 
 def write_dist_info_with_requires_python(
         payload_directory, name, version, requires_python):
