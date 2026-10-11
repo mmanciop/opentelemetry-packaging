@@ -1,13 +1,13 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for the functions common.py shares between the scripts."""
+"""Unit tests for the code in shared.py that several scripts use."""
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from common import (
+from shared import (
     MinimumRequiredPythonVersionError,
     derive_minimum_required_python_version_from_bundled_distributions,
     read_supported_python_versions,

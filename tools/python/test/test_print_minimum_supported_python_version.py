@@ -9,7 +9,7 @@ from sys import executable
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from common import read_supported_python_versions
+from shared import read_supported_python_versions
 from python_version_test_helpers import (
     PRINT_SCRIPT_PATH,
     SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE,

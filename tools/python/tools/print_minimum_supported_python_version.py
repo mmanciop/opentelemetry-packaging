@@ -4,7 +4,7 @@
 """Print the minimum supported Python version as major.minor.
 
 The minimum supported Python version and the supported Python versions it is
-the lowest of are defined in the module docstring of common.py, next to this
+the lowest of are defined in the module docstring of shared.py, next to this
 script, which is the only place either term is defined.
 
 This script needs no virtualenv and no payload directory, so CI can run it to
@@ -14,7 +14,7 @@ check_supported_python_versions.py.
 
 from pathlib import Path
 
-from common import build_argument_parser, read_supported_python_versions
+from shared import build_argument_parser, read_supported_python_versions
 
 
 def main() -> int:

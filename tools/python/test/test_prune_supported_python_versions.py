@@ -8,7 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from common import read_supported_python_versions
+from shared import read_supported_python_versions
 from prune_supported_python_versions import prune_supported_python_versions
 from python_version_test_helpers import (
     PRUNE_SCRIPT_PATH,

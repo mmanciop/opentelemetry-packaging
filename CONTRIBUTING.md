@@ -47,7 +47,7 @@ testutil/                    Shared Go test helpers
 tools/                       Repository tooling, never packaged
   python/
     tools/                   Scripts that print, check and prune the supported Python versions,
-                             plus common.py, whose module docstring defines the terms they use
+                             plus shared.py, whose module docstring defines the terms they use
     test/                    Unit tests for those scripts
 docs/design/                 Architecture and design documents
 ```
@@ -238,7 +238,7 @@ They run in a throwaway virtualenv under `build/`, so the host Python is untouch
 make python-unit-tests
 ```
 
-The second suite lives in `tools/python/test/` and imports `common.py` from its sibling `tools/python/tools/`, which `unittest discover` does not put on `sys.path`.
+The second suite lives in `tools/python/test/` and imports `shared.py` from its sibling `tools/python/tools/`, which `unittest discover` does not put on `sys.path`.
 Running it by hand therefore needs `PYTHONPATH`:
 
 ```sh
@@ -248,7 +248,7 @@ PYTHONPATH=tools/python/tools python3 -m unittest discover --start-directory too
 ### Supported Python versions check (fast, no containers)
 
 Checks that no supported Python version is below the minimum required Python version.
-Both terms are defined in the module docstring of `tools/python/tools/common.py`, which is the only place either one is defined.
+Both terms are defined in the module docstring of `tools/python/tools/shared.py`, which is the only place either one is defined.
 It installs the PyPI pins into a throwaway payload directory with `pip install --target`, the same way the builder assembles the payload, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
 It needs the interpreter for the minimum supported Python version to be installed, because its pip must resolve the payload's transitive dependencies the way it would on that version; set `MINIMUM_SUPPORTED_PYTHON_INTERPRETER` to point at that interpreter if it is not on `PATH` under the default name.
 Run `python3 tools/python/tools/prune_supported_python_versions.py` to drop the supported Python versions that fall below the minimum required Python version.

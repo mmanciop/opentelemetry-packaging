@@ -403,11 +403,11 @@ go-unit-tests:
 # Unit tests for sitecustomize.py and for the supported Python version scripts
 # under tools/python/tools/. They need the `packaging` module (a runtime
 # dependency of sitecustomize.py itself) and, under Python 3.10, the `tomli`
-# backport that tools/python/tools/common.py falls back to where the stdlib
+# backport that tools/python/tools/shared.py falls back to where the stdlib
 # tomllib is absent; a throwaway virtualenv keeps the host Python untouched.
 # The two suites are discovered separately so that neither directory has to be
 # importable from the other. PYTHONPATH is what lets tools/python/test/ import
-# common.py from its sibling tools/python/tools/, which unittest discovery
+# shared.py from its sibling tools/python/tools/, which unittest discovery
 # puts on sys.path for neither.
 .PHONY: python-unit-tests
 python-unit-tests:
@@ -496,7 +496,7 @@ pyproto-unit-tests:
 # Check that no supported Python version is below the minimum required Python
 # version. Both terms, the two phases this runs in, and the environment
 # variables MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR are documented
-# in the module docstring of tools/python/tools/common.py, which is the only
+# in the module docstring of tools/python/tools/shared.py, which is the only
 # place either term is defined. Run
 # tools/python/tools/prune_supported_python_versions.py to drop the versions
 # this reports.

@@ -4,7 +4,7 @@
 """Drop the supported Python versions below the minimum required one.
 
 The supported Python versions and the minimum required Python version are
-defined in the module docstring of common.py, next to this script, which is
+defined in the module docstring of shared.py, next to this script, which is
 the only place either term is defined. That docstring also documents the two
 phases this script runs in and the environment variables
 MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR.
@@ -19,7 +19,7 @@ from json import dumps
 from pathlib import Path
 from sys import stderr
 
-from common import (
+from shared import (
     SUPPORTED_PYTHON_VERSIONS_FILE_NAME,
     MinimumRequiredPythonVersionError,
     add_payload_arguments,
