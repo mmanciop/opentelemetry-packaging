@@ -111,7 +111,7 @@ class TestPayloadScopedEnumeration(TestCase):
                 versions_path)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("derived minimum Python: 3.7", completed.stdout)
+        self.assertIn("derived floor: 3.7", completed.stdout)
 
     def test_strictest_payload_distribution_decides_the_floor(self):
         with TemporaryDirectory() as temporary_directory:
@@ -131,7 +131,7 @@ class TestPayloadScopedEnumeration(TestCase):
                 versions_path)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("derived minimum Python: 3.11", completed.stdout)
+        self.assertIn("derived floor: 3.11", completed.stdout)
 
     def test_missing_payload_directory_fails(self):
         # A mistyped or unbuilt payload path must be an error rather than a

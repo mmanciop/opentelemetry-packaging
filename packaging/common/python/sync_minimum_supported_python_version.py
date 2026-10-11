@@ -1,7 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Derive and enforce the minimum Python version the package is built for.
+"""Derive the Python floor of the bundled distributions and enforce it.
 
 The minimum supported Python of the bundled agent is the strictest
 Requires-Python lower bound across every distribution that ships in the package
@@ -218,14 +218,14 @@ def main():
         requires_python_strings)
     if derived_floor is None:
         print(
-            "could not derive a minimum Python version: no distribution or "
+            "could not derive the floor: no distribution or "
             "vendored pyproject declared Requires-Python",
             file=stderr)
         return 1
     derived_major, derived_minor = derived_floor
     if derived_major != 3:
         print(
-            "derived minimum Python major is {}, not 3; {} and the "
+            "the derived floor has major version {}, not 3; {} and the "
             "sitecustomize.py gate only support 3.x and must be updated for "
             "major-version bumps".format(
                 derived_major, _VERSIONS_FILE_NAME),
@@ -238,7 +238,7 @@ def main():
     below_floor = [
         version for version in supported_versions if version < derived_floor]
 
-    print("derived minimum Python: {}.{}".format(derived_major, derived_minor))
+    print("derived floor: {}.{}".format(derived_major, derived_minor))
     print("supported Python versions: {}".format(
         format_versions(supported_versions)))
 
