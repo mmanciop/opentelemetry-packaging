@@ -9,14 +9,16 @@
 #
 # Usage: check-minimum-supported-python-version.sh [--check|--write]
 #
-#   --check (the default) fails when a listed version is below the derived
-#   floor.
-#   --write drops the listed versions below the derived floor.
+#   --check (the default) fails when a listed version is below the minimum
+#   required Python version.
+#   --write drops the listed versions below the minimum required Python
+#   version.
 #
 # Environment:
 #
-#   MINIMUM_SUPPORTED_PYTHON  Interpreter that derives the floor (default: the lowest
-#                   version in the supported versions file, as pythonX.Y).
+#   MINIMUM_SUPPORTED_PYTHON  Interpreter that derives the minimum required
+#                   Python version (default: the lowest version in the
+#                   supported versions file, as pythonX.Y).
 #   BUILD_DIR       Scratch directory for the venv and the payload
 #                   (default: build/ at the repository root, removed by
 #                   "make clean").
@@ -26,19 +28,21 @@
 # packaging/builder/download.go assembles the payload for the DEB and the RPM,
 # and sync_minimum_supported_python_version.py enumerates only that directory. A
 # virtualenv would additionally contain pip and setuptools from "python -m venv"
-# plus the tool's own tomli, none of which ship; since the floor is a maximum, a
-# non-shipped distribution can only raise it, which would mask a floor that
-# should drop while the check still reported "in sync".
+# plus the tool's own tomli, none of which ship; since the minimum required
+# Python version is a maximum, a non-shipped distribution can only raise it,
+# which would mask a value that should drop while the check still reported
+# "in sync".
 #
-# The vendored floor is read straight from each vendor pyproject.toml via
-# --vendor-dir, so the vendored source does not need to be built for the check.
+# The vendored requires-python values are read straight from each vendor
+# pyproject.toml via --vendor-dir, so the vendored source does not need to be
+# built for the check.
 #
 # The venv that runs the tool is built with the lowest supported interpreter
 # on purpose: its pip must resolve the payload's
 # transitive dependencies the way it would on that version, so a newer release
 # of a transitive dependency that raised its own Requires-Python does not
-# inflate the derived floor above what actually runs on the lowest supported
-# interpreter. tomli is the tomllib backport the tool falls back to under
+# inflate the minimum required Python version above what actually runs on the
+# lowest supported interpreter. tomli is the tomllib backport the tool falls back to under
 # Python 3.10 (tomllib is standard library from 3.11).
 
 set -euo pipefail
@@ -70,10 +74,11 @@ VENV_DIR="${BUILD_DIR}/minimum-supported-python-version-venv"
 PAYLOAD_DIR="${BUILD_DIR}/minimum-supported-python-version-payload"
 
 if ! command -v "${MINIMUM_SUPPORTED_PYTHON}" > /dev/null 2>&1; then
-    echo "error: ${MINIMUM_SUPPORTED_PYTHON} is not installed. The floor must be derived" \
-        "with the minimum supported interpreter so that pip resolves" \
-        "transitive dependencies the way it does on that floor. Install it, or" \
-        "set MINIMUM_SUPPORTED_PYTHON to the interpreter for the current floor." >&2
+    echo "error: ${MINIMUM_SUPPORTED_PYTHON} is not installed. The minimum" \
+        "required Python version must be derived with the minimum supported" \
+        "interpreter so that pip resolves transitive dependencies the way it" \
+        "does there. Install it, or set MINIMUM_SUPPORTED_PYTHON to the" \
+        "interpreter for the lowest supported version." >&2
     exit 1
 fi
 
