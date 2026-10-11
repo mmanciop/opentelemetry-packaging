@@ -47,7 +47,7 @@ jobs:
         id: minimum_supported_python_version
         run: |
           version="$(python3 \
-            tools/supported-python-versions/print-minimum-supported-python-version.py)"
+            tools/python/print-minimum-supported-python-version.py)"
           test -n "${version}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 

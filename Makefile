@@ -400,13 +400,12 @@ integration-test-rpm-vendor: local-rpm-repo local-rpm-vendor-repo
 go-unit-tests:
 	go test -v ./cmd/...
 
-# Unit tests for sitecustomize.py and for the supported Python version
-# scripts under tools/supported-python-versions/. They need the `packaging`
-# module (a runtime dependency of sitecustomize.py itself) and, under Python
-# 3.10, the `tomli` backport that tools/supported-python-versions/common.py
-# falls back to where the stdlib tomllib is absent; a throwaway virtualenv
-# keeps the host Python untouched. The two directories are discovered
-# separately so that neither has to be importable from the other.
+# Unit tests for sitecustomize.py and for the supported Python version scripts
+# under tools/python/. They need the `packaging` module (a runtime dependency
+# of sitecustomize.py itself) and, under Python 3.10, the `tomli` backport that
+# tools/python/common.py falls back to where the stdlib tomllib is absent; a
+# throwaway virtualenv keeps the host Python untouched. The two directories are
+# discovered separately so that neither has to be importable from the other.
 .PHONY: python-unit-tests
 python-unit-tests:
 	python3 -m venv build/python-unit-tests-venv
@@ -414,8 +413,7 @@ python-unit-tests:
 	build/python-unit-tests-venv/bin/python -m unittest discover \
 		--start-directory packaging/common/python --pattern 'test_*.py' --verbose
 	build/python-unit-tests-venv/bin/python -m unittest discover \
-		--start-directory tools/supported-python-versions \
-		--pattern 'test_*.py' --verbose
+		--start-directory tools/python --pattern 'test_*.py' --verbose
 
 # Upstream test suites of the vendored pyproto exporter chain
 # (packaging/common/python/vendor/), in two throwaway venvs. The vendored
@@ -494,13 +492,12 @@ pyproto-unit-tests:
 # Check that no supported Python version is below the minimum required Python
 # version. Both terms, the two phases this runs in, and the environment
 # variables MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR are documented
-# in the module docstring of tools/supported-python-versions/common.py, which
-# is the only place either term is defined. Run
-# tools/supported-python-versions/prune-supported-python-versions.py to drop
-# the versions this reports.
+# in the module docstring of tools/python/common.py, which is the only place
+# either term is defined. Run tools/python/prune-supported-python-versions.py
+# to drop the versions this reports.
 .PHONY: check-supported-python-versions
 check-supported-python-versions:
-	python3 tools/supported-python-versions/check-supported-python-versions.py
+	python3 tools/python/check-supported-python-versions.py
 
 # ============================================================================
 # Lint

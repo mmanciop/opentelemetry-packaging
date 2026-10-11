@@ -45,7 +45,7 @@ packaging/
 testutil/                    Shared Go test helpers
   otelsink/                  In-process OTLP sink + typed assertion API for E2E tests
 tools/                       Repository tooling, never packaged
-  supported-python-versions/ Scripts that print, check and prune the supported Python versions,
+  python/                    Scripts that print, check and prune the supported Python versions,
                              plus common.py, whose module docstring defines the terms they use (plus their unit tests)
 docs/design/                 Architecture and design documents
 ```
@@ -239,10 +239,10 @@ make python-unit-tests
 ### Supported Python versions check (fast, no containers)
 
 Checks that no supported Python version is below the minimum required Python version.
-Both terms are defined in the module docstring of `tools/supported-python-versions/common.py`, which is the only place either one is defined.
+Both terms are defined in the module docstring of `tools/python/common.py`, which is the only place either one is defined.
 It installs the PyPI pins into a throwaway payload directory with `pip install --target`, the same way the builder assembles the payload, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
 It needs the interpreter for the minimum supported Python version to be installed, because its pip must resolve the payload's transitive dependencies the way it would on that version; set `MINIMUM_SUPPORTED_PYTHON_INTERPRETER` to point at that interpreter if it is not on `PATH` under the default name.
-Run `python3 tools/supported-python-versions/prune-supported-python-versions.py` to drop the supported Python versions that fall below the minimum required Python version.
+Run `python3 tools/python/prune-supported-python-versions.py` to drop the supported Python versions that fall below the minimum required Python version.
 
 ```sh
 make check-supported-python-versions
