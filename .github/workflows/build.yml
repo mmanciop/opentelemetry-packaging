@@ -58,7 +58,7 @@ jobs:
           python-version: ${{ steps.minimum_python.outputs.version }}
 
       - name: Check the supported Python versions are in sync with the bundled distributions
-        run: make check-minimum-python-version
+        run: make check-minimum-supported-python-version
 
   sitecustomize-compatibility-tests:
     runs-on: ubuntu-26.04

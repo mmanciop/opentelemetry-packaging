@@ -400,9 +400,9 @@ integration-test-rpm-vendor: local-rpm-repo local-rpm-vendor-repo
 go-unit-tests:
 	go test -v ./cmd/...
 
-# Unit tests for sitecustomize.py and sync_minimum_python_version.py. They need
+# Unit tests for sitecustomize.py and sync_minimum_supported_python_version.py. They need
 # the `packaging` module (a runtime dependency of sitecustomize.py itself) and,
-# under Python 3.10, the `tomli` backport that sync_minimum_python_version.py
+# under Python 3.10, the `tomli` backport that sync_minimum_supported_python_version.py
 # falls back to where the stdlib tomllib is absent; a throwaway virtualenv keeps
 # the host Python untouched.
 .PHONY: python-unit-tests
@@ -493,10 +493,10 @@ pyproto-unit-tests:
 # documents how the floor is derived, why only the shipped payload
 # contributes to it, and why the lowest supported interpreter derives it; it
 # also takes --write to drop the listed versions below the floor, and reads
-# MINIMUM_PYTHON and BUILD_DIR from the environment.
-.PHONY: check-minimum-python-version
-check-minimum-python-version:
-	.github/scripts/check-minimum-python-version.sh --check
+# MINIMUM_SUPPORTED_PYTHON and BUILD_DIR from the environment.
+.PHONY: check-minimum-supported-python-version
+check-minimum-supported-python-version:
+	.github/scripts/check-minimum-supported-python-version.sh --check
 
 # ============================================================================
 # Lint

@@ -1,7 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for sync_minimum_python_version.py."""
+"""Unit tests for sync_minimum_supported_python_version.py."""
 
 from json import dumps, loads
 from pathlib import Path
@@ -10,13 +10,13 @@ from sys import executable
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from sync_minimum_python_version import (
+from sync_minimum_supported_python_version import (
     lowest_supported_major_minor_across_requires_python,
     prune_supported_versions,
     read_supported_versions,
 )
 
-_TOOL_PATH = str(Path(__file__).with_name("sync_minimum_python_version.py"))
+_TOOL_PATH = str(Path(__file__).with_name("sync_minimum_supported_python_version.py"))
 
 _SHIPPED_VERSIONS_FILE = Path(__file__).parents[2] / "builder" / (
     "supported_python_versions.json")
@@ -49,7 +49,7 @@ def write_versions_file(versions_path, versions):
         dumps(list(versions)) + "\n", encoding="utf-8")
 
 
-def run_sync_minimum_python_version(
+def run_sync_minimum_supported_python_version(
         mode, payload_directory, vendor_directory, versions_path):
     """Run the tool in --check or --write mode and return the completed run."""
     return run(
@@ -106,7 +106,7 @@ class TestPayloadScopedEnumeration(TestCase):
             versions_path = temporary_path / "supported_python_versions.json"
             write_versions_file(versions_path, ["3.7", "3.8"])
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
                 versions_path)
 
@@ -126,7 +126,7 @@ class TestPayloadScopedEnumeration(TestCase):
             versions_path = temporary_path / "supported_python_versions.json"
             write_versions_file(versions_path, ["3.11", "3.12"])
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
                 versions_path)
 
@@ -149,7 +149,7 @@ class TestPayloadScopedEnumeration(TestCase):
             versions_path = temporary_path / "supported_python_versions.json"
             write_versions_file(versions_path, ["3.10"])
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--check", temporary_path / "no-such-payload",
                 temporary_path / "vendor", versions_path)
 
@@ -166,7 +166,7 @@ class TestPayloadScopedEnumeration(TestCase):
             versions_path = temporary_path / "supported_python_versions.json"
             write_versions_file(versions_path, ["3.10"])
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
                 versions_path)
 
@@ -198,7 +198,7 @@ class TestVendorPyprojectParsing(TestCase):
             write_versions_file(
                 versions_path, ["3.10", "3.11", "3.12"])
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, temporary_path / "vendor",
                 versions_path)
 
@@ -268,7 +268,7 @@ class TestCheckAndWriteEndToEnd(TestCase):
             versions_path = temporary_path / "supported_python_versions.json"
             write_versions_file(versions_path, ["3.11", "3.12"])
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
                 versions_path)
 
@@ -290,7 +290,7 @@ class TestCheckAndWriteEndToEnd(TestCase):
             write_versions_file(
                 versions_path, ["3.10", "3.11", "3.12"])
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
                 versions_path)
 
@@ -313,7 +313,7 @@ class TestCheckAndWriteEndToEnd(TestCase):
             versions_path = temporary_path / "supported_python_versions.json"
             write_versions_file(versions_path, ["3.10", "3.11"])
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--check", payload_directory, vendor_directory,
                 versions_path)
 
@@ -340,7 +340,7 @@ class TestCheckAndWriteEndToEnd(TestCase):
             versions_path.write_text(
                 _FOUR_VERSIONS_JSON, encoding="utf-8")
 
-            completed = run_sync_minimum_python_version(
+            completed = run_sync_minimum_supported_python_version(
                 "--write", payload_directory, temporary_path / "vendor",
                 versions_path)
             self.assertEqual(completed.returncode, 0, completed.stderr)

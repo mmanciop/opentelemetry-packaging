@@ -247,7 +247,7 @@ def main():
             print(
                 "{} lists {} below the derived floor {}.{}; pip cannot "
                 "resolve the payload for those interpreters. Run "
-                "sync_minimum_python_version.py --write to drop them.".format(
+                "sync_minimum_supported_python_version.py --write to drop them.".format(
                     _VERSIONS_FILE_NAME, format_versions(below_floor),
                     derived_major, derived_minor),
                 file=stderr)
