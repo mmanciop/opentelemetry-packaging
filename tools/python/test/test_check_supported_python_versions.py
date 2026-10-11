@@ -18,7 +18,8 @@ from python_version_test_helpers import (
 class TestPayloadScopedEnumeration(TestCase):
 
     def test_minimum_required_python_version_comes_only_from_the_payload_directory(
-            self):
+        self
+    ):
         # The payload declares a single distribution at >=3.7, so the
         # minimum required Python version is 3.7. The interpreter running
         # this test has packaging installed (>=3.9), plus pip and
@@ -53,7 +54,8 @@ class TestPayloadScopedEnumeration(TestCase):
         self.assertIn("minimum required Python version: 3.7", completed.stdout)
 
     def test_strictest_payload_distribution_decides_the_minimum_required_python_version(
-            self):
+        self
+    ):
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -181,7 +183,8 @@ class TestVendorPyprojectParsing(TestCase):
 class TestCheckOutcome(TestCase):
 
     def test_check_passes_when_every_supported_python_version_meets_the_minimum_required_python_version(
-            self):
+        self
+    ):
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"
@@ -208,7 +211,8 @@ class TestCheckOutcome(TestCase):
         self.assertIn("are in sync", completed.stdout)
 
     def test_check_fails_when_a_supported_python_version_is_below_the_minimum_required_python_version(
-            self):
+        self
+    ):
         # This is the regression the check exists for: a dependency bump
         # raises the minimum to 3.11 while the builder still tries to resolve
         # the payload for 3.10, which pip cannot do.
@@ -272,7 +276,8 @@ class TestCheckOutcome(TestCase):
         self.assertEqual(before, after)
 
     def test_check_passes_with_a_note_when_the_minimum_required_python_version_is_below_every_supported_python_version(
-            self):
+        self
+    ):
         # Shipping fewer interpreters than the dependencies permit is a
         # deliberate choice, because wheel availability rather than
         # Requires-Python governs the top of the list, so this reports rather

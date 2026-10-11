@@ -221,7 +221,8 @@ def format_python_versions(versions):
 
 
 def derive_minimum_required_python_version_from_bundled_distributions(
-        payload_directory, vendor_directory):
+    payload_directory, vendor_directory
+):
     """Return the minimum required Python version of what the package ships.
 
     Reads Requires-Python from every distribution installed in
@@ -292,7 +293,8 @@ def derive_minimum_required_python_version_from_bundled_distributions(
 
 
 def prepare_payload_and_rerun_in_the_virtualenv(
-        script_path, minimum_supported_python_version, arguments):
+    script_path, minimum_supported_python_version, arguments
+):
     """Build the virtualenv and the payload, then rerun script_path in it.
 
     This is the preparation phase the module docstring describes. Returns the

@@ -30,7 +30,8 @@ SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE = (
 
 
 def write_dist_info_with_requires_python(
-        payload_directory, name, version, requires_python):
+    payload_directory, name, version, requires_python
+):
     """Create a <name>-<version>.dist-info/METADATA under payload_directory.
 
     This is the minimum importlib.metadata needs to enumerate a distribution
@@ -52,15 +53,17 @@ def write_dist_info_with_requires_python(
 
 
 def write_supported_python_versions_file(
-        supported_python_versions_path, versions):
+    supported_python_versions_path, versions
+):
     """Write a versions file listing the given "major.minor" strings."""
     supported_python_versions_path.write_text(
         dumps(list(versions)) + "\n", encoding="utf-8")
 
 
 def run_payload_script(
-        script_path, payload_directory, vendor_directory,
-        supported_python_versions_path):
+    script_path, payload_directory, vendor_directory,
+    supported_python_versions_path
+):
     """Run a payload script's work phase and return the completed run.
 
     Passing --payload-dir selects the work phase directly, so no virtualenv

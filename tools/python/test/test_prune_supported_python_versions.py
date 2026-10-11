@@ -37,7 +37,8 @@ class TestPruneTheSupportedPythonVersionsText(TestCase):
             "these tests need at least two supported Python versions")
 
     def test_prune_drops_only_the_supported_python_versions_below_the_minimum_required_python_version(
-            self):
+        self
+    ):
         second_lowest_version = sorted(self.shipped_versions)[1]
 
         pruned = read_supported_python_versions(
@@ -72,7 +73,8 @@ class TestPruneTheSupportedPythonVersionsText(TestCase):
 class TestPruneScriptEndToEnd(TestCase):
 
     def test_prune_drops_the_supported_python_versions_below_the_minimum_required_python_version(
-            self):
+        self
+    ):
         # The versions the package ships go in, and a vendored pyproject
         # demanding the second-lowest of them puts the minimum required
         # Python version there, so the prune must drop the lowest one and

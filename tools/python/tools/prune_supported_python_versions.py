@@ -32,7 +32,8 @@ from common import (
 
 
 def prune_supported_python_versions(
-        supported_python_versions_text, minimum_required_python_version):
+    supported_python_versions_text, minimum_required_python_version
+):
     """Return the supported Python versions JSON without the ones below.
 
     minimum_required_python_version is a (major, minor) pair. Raises
