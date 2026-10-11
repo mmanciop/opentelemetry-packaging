@@ -491,9 +491,10 @@ pyproto-unit-tests:
 # packaging/builder/download.go embeds, is at or above the strictest
 # Requires-Python across the distributions that actually ship. The script
 # documents how the minimum required Python version is derived, why only the
-# shipped payload contributes to it, and why the lowest supported interpreter
-# derives it; it also takes --write to drop the listed versions below that
-# version, and reads MINIMUM_SUPPORTED_PYTHON and BUILD_DIR from the
+# shipped payload contributes to it, and why the interpreter for the minimum
+# supported Python version derives it; it also takes --write to drop the
+# supported Python versions below the minimum required Python version, and
+# reads MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR from the
 # environment.
 .PHONY: check-minimum-supported-python-version
 check-minimum-supported-python-version:

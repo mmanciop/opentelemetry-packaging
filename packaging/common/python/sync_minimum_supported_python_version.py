@@ -3,9 +3,9 @@
 
 """Derive the minimum required Python version and enforce it.
 
-The minimum supported Python of the bundled agent is the strictest
-Requires-Python lower bound across every distribution that ships in the package
-and every vendored package's pyproject.toml. That value is the minimum
+The minimum required Python version of the bundled agent is the strictest
+Requires-Python lower bound across every distribution that ships in the
+package and every vendored package's pyproject.toml. That value is the minimum
 required Python version. This script derives it and either checks it against
 the interpreter list the builder resolves wheels for (--check) or prunes that
 list to match (--write).
@@ -70,14 +70,14 @@ except ModuleNotFoundError:
 # version it admits. Python 3 minors are the realistic range for this project;
 # major 4 is included so that a future 4.x-only minimum is detected and
 # reported as needing a refactor rather than silently mis-derived.
-_CANDIDATE_VERSIONS = [(3, minor) for minor in range(0, 31)] + [
+_CANDIDATE_PYTHON_VERSIONS = [(3, minor) for minor in range(0, 31)] + [
     (4, minor) for minor in range(0, 31)
 ]
 
-_VERSIONS_FILE_NAME = "supported_python_versions.json"
+_SUPPORTED_PYTHON_VERSIONS_FILE_NAME = "supported_python_versions.json"
 
 
-def minimum_required_major_minor(
+def derive_minimum_required_python_version(
         requires_python_strings):
     """Return the strictest (major, minor) lower bound over the given specs.
 
@@ -94,7 +94,7 @@ def minimum_required_major_minor(
             continue
         specifier_set = SpecifierSet(requires_python)
         lowest_admitted = None
-        for major, minor in _CANDIDATE_VERSIONS:
+        for major, minor in _CANDIDATE_PYTHON_VERSIONS:
             if specifier_set.contains(Version("{}.{}".format(major, minor))):
                 lowest_admitted = (major, minor)
                 break
@@ -105,25 +105,25 @@ def minimum_required_major_minor(
     return max(per_specifier_minimums)
 
 
-def read_supported_versions(versions_text):
-    """Return the (major, minor) pairs listed in the supported versions file.
+def read_supported_python_versions(supported_python_versions_text):
+    """Return the (major, minor) pairs of the supported Python versions.
 
     Takes the text of packaging/builder/supported_python_versions.json, which
     holds a JSON array of "major.minor" strings. Raises ValueError if the
     document is not such an array or lists no version.
     """
     try:
-        parsed = loads(versions_text)
+        parsed = loads(supported_python_versions_text)
     except JSONDecodeError as error:
         raise ValueError(
             "{} is not valid JSON: {}".format(
-                _VERSIONS_FILE_NAME, error)) from error
+                _SUPPORTED_PYTHON_VERSIONS_FILE_NAME, error)) from error
     if not isinstance(parsed, list):
         raise ValueError(
             "{} must hold a JSON array, found {}".format(
-                _VERSIONS_FILE_NAME, type(parsed).__name__))
+                _SUPPORTED_PYTHON_VERSIONS_FILE_NAME, type(parsed).__name__))
     if not parsed:
-        raise ValueError("{} lists no version".format(_VERSIONS_FILE_NAME))
+        raise ValueError("{} lists no version".format(_SUPPORTED_PYTHON_VERSIONS_FILE_NAME))
     versions = []
     for entry in parsed:
         major, _, minor = entry.partition(".") if isinstance(
@@ -131,30 +131,30 @@ def read_supported_versions(versions_text):
         if not major.isdigit() or not minor.isdigit():
             raise ValueError(
                 '{} entries must be strings like "3.10", found {!r}'.format(
-                    _VERSIONS_FILE_NAME, entry))
+                    _SUPPORTED_PYTHON_VERSIONS_FILE_NAME, entry))
         versions.append((int(major), int(minor)))
     return versions
 
 
-def prune_supported_versions(versions_text, minimum_required_version):
-    """Return supported versions JSON without the versions below the minimum.
+def prune_supported_python_versions(supported_python_versions_text, minimum_required_python_version):
+    """Return the supported Python versions JSON without the ones below.
 
-    minimum_required_version is a (major, minor) pair. Raises ValueError if
+    minimum_required_python_version is a (major, minor) pair. Raises ValueError if
     pruning would empty the list, which would mean no interpreter the builder
     knows about can run the bundled distributions at all.
     """
     kept = [
-        version for version in read_supported_versions(versions_text)
-        if version >= minimum_required_version]
+        version for version in read_supported_python_versions(supported_python_versions_text)
+        if version >= minimum_required_python_version]
     if not kept:
         raise ValueError(
             "pruning to the minimum required Python version {}.{} would "
             "empty {}".format(
-                *minimum_required_version, _VERSIONS_FILE_NAME))
+                *minimum_required_python_version, _SUPPORTED_PYTHON_VERSIONS_FILE_NAME))
     return dumps(["{}.{}".format(*version) for version in kept]) + "\n"
 
 
-def format_versions(versions):
+def format_python_versions(versions):
     """Return a comma-separated "major.minor" rendering of the given pairs."""
     return ", ".join("{}.{}".format(*version) for version in versions)
 
@@ -163,10 +163,10 @@ def main():
     argument_parser = ArgumentParser(description=__doc__)
     script_directory = dirname(__file__)
     argument_parser.add_argument(
-        "--versions-file",
+        "--supported-python-versions-file",
         default=join(
-            script_directory, "..", "..", "builder", _VERSIONS_FILE_NAME),
-        help="path to the JSON array of supported interpreters that "
+            script_directory, "..", "..", "builder", _SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
+        help="path to the JSON array of supported Python versions that "
              "packaging/builder/download.go embeds "
              "(default: the one in this repository)")
     argument_parser.add_argument(
@@ -184,13 +184,13 @@ def main():
     mode_group.add_argument(
         "--check",
         action="store_true",
-        help="verify no supported interpreter is below the minimum required "
-             "Python version; exit 1 if one is")
+        help="verify no supported Python version is below the minimum "
+             "required Python version; exit 1 if one is")
     mode_group.add_argument(
         "--write",
         action="store_true",
-        help="drop the supported interpreters below the minimum required "
-             "Python version")
+        help="drop the supported Python versions below the minimum "
+             "required Python version")
     arguments = argument_parser.parse_args()
 
     # Collect Requires-Python from every shipped distribution, then from every
@@ -219,68 +219,68 @@ def main():
         requires_python_strings.append(
             pyproject_data.get("project", {}).get("requires-python"))
 
-    minimum_required_version = minimum_required_major_minor(
+    minimum_required_python_version = derive_minimum_required_python_version(
         requires_python_strings)
-    if minimum_required_version is None:
+    if minimum_required_python_version is None:
         print(
             "could not derive the minimum required Python version: no "
             "distribution or "
             "vendored pyproject declared Requires-Python",
             file=stderr)
         return 1
-    required_major, required_minor = minimum_required_version
-    if required_major != 3:
+    minimum_required_python_version_major, minimum_required_python_version_minor = minimum_required_python_version
+    if minimum_required_python_version_major != 3:
         print(
             "the minimum required Python version has major version {}, not "
             "3; {} and the "
             "sitecustomize.py gate only support 3.x and must be updated for "
             "major-version bumps".format(
-                required_major, _VERSIONS_FILE_NAME),
+                minimum_required_python_version_major, _SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
             file=stderr)
         return 1
 
-    with open(arguments.versions_file, encoding="utf-8") as versions_file:
-        versions_text = versions_file.read()
-    supported_versions = read_supported_versions(versions_text)
-    below_minimum_required = [
-        version for version in supported_versions
-        if version < minimum_required_version]
+    with open(arguments.supported_python_versions_file, encoding="utf-8") as supported_python_versions_file:
+        supported_python_versions_text = supported_python_versions_file.read()
+    supported_python_versions = read_supported_python_versions(supported_python_versions_text)
+    below_minimum_required_python_version = [
+        version for version in supported_python_versions
+        if version < minimum_required_python_version]
 
     print("minimum required Python version: {}.{}".format(
-        required_major, required_minor))
+        minimum_required_python_version_major, minimum_required_python_version_minor))
     print("supported Python versions: {}".format(
-        format_versions(supported_versions)))
+        format_python_versions(supported_python_versions)))
 
     if arguments.check:
-        if below_minimum_required:
+        if below_minimum_required_python_version:
             print(
                 "{} lists {} below the minimum required Python version "
                 "{}.{}; pip cannot resolve the payload for those "
                 "interpreters. Run sync_minimum_supported_python_version.py "
                 "--write to drop them.".format(
-                    _VERSIONS_FILE_NAME,
-                    format_versions(below_minimum_required),
-                    required_major, required_minor),
+                    _SUPPORTED_PYTHON_VERSIONS_FILE_NAME,
+                    format_python_versions(below_minimum_required_python_version),
+                    minimum_required_python_version_major, minimum_required_python_version_minor),
                 file=stderr)
             return 1
-        if min(supported_versions) > minimum_required_version:
+        if min(supported_python_versions) > minimum_required_python_version:
             print(
                 "note: the bundled distributions would also permit {}.{}, "
                 "which the package does not ship".format(
-                    required_major, required_minor))
+                    minimum_required_python_version_major, minimum_required_python_version_minor))
         print("supported Python versions are in sync")
         return 0
 
-    if not below_minimum_required:
-        print("no supported interpreter is below the minimum required "
+    if not below_minimum_required_python_version:
+        print("no supported Python version is below the minimum required "
               "Python version; nothing to prune")
         return 0
-    pruned_text = prune_supported_versions(
-        versions_text, minimum_required_version)
-    with open(arguments.versions_file, "w", encoding="utf-8") as versions_file:
-        versions_file.write(pruned_text)
+    pruned_text = prune_supported_python_versions(
+        supported_python_versions_text, minimum_required_python_version)
+    with open(arguments.supported_python_versions_file, "w", encoding="utf-8") as supported_python_versions_file:
+        supported_python_versions_file.write(pruned_text)
     print("dropped {} from {}".format(
-        format_versions(below_minimum_required), _VERSIONS_FILE_NAME))
+        format_python_versions(below_minimum_required_python_version), _SUPPORTED_PYTHON_VERSIONS_FILE_NAME))
     return 0
 
 

@@ -238,7 +238,7 @@ make python-unit-tests
 
 Checks that every interpreter listed in `packaging/builder/supported_python_versions.json` is at or above the strictest `Requires-Python` across the distributions that ship in the Python package.
 The check installs the PyPI pins into a throwaway payload directory with `pip install --target`, the same way the builder assembles the payload, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
-It needs the lowest listed interpreter to be installed, because its pip must resolve the payload's transitive dependencies the way it would on that version; set `MINIMUM_SUPPORTED_PYTHON` to point at that interpreter if it is not on `PATH` under the default name.
+It needs the lowest listed interpreter to be installed, because its pip must resolve the payload's transitive dependencies the way it would on that version; set `MINIMUM_SUPPORTED_PYTHON_INTERPRETER` to point at that interpreter if it is not on `PATH` under the default name.
 Run `.github/scripts/check-minimum-supported-python-version.sh --write` to drop the listed versions that fall below the minimum required Python version.
 
 ```sh
