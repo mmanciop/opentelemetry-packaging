@@ -43,12 +43,11 @@ jobs:
       - name: Run the vendored pyproto exporter test suites
         run: make pyproto-unit-tests
 
-      - name: Resolve the minimum supported Python version from the builder
+      - name: Resolve the minimum supported Python version
         id: minimum_supported_python_version
         run: |
-          version="$(grep -o '"[0-9]\{1,\}\.[0-9]\{1,\}"' \
-            packaging/builder/supported_python_versions.json \
-            | tr -d '"' | sort -V | head -1)"
+          version="$(python3 packaging/common/python/sync_minimum_supported_python_version.py \
+            --print-minimum-supported-python-version)"
           test -n "${version}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 

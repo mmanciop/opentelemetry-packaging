@@ -487,14 +487,14 @@ pyproto-unit-tests:
 	done
 
 # Check that no supported Python version is below the minimum required Python
-# version. Both terms are defined in the module docstring of
+# version. Both terms, the two phases this runs in, and the environment
+# variables MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR are documented
+# in the module docstring of
 # packaging/common/python/sync_minimum_supported_python_version.py, which is
-# the only place either one is defined. The script wrapping it takes --write
-# as well, and reads MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR from
-# the environment.
+# the only place either term is defined. The same file takes --write.
 .PHONY: check-minimum-supported-python-version
 check-minimum-supported-python-version:
-	.github/scripts/check-minimum-supported-python-version.sh --check
+	python3 packaging/common/python/sync_minimum_supported_python_version.py --check
 
 # ============================================================================
 # Lint

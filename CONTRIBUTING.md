@@ -45,7 +45,6 @@ packaging/
 testutil/                    Shared Go test helpers
   otelsink/                  In-process OTLP sink + typed assertion API for E2E tests
 docs/design/                 Architecture and design documents
-.github/scripts/             Shell scripts invoked by Makefile targets and CI workflows
 ```
 
 ## How package builds work
@@ -238,9 +237,9 @@ make python-unit-tests
 
 Checks that no supported Python version is below the minimum required Python version.
 Both terms are defined in the module docstring of `packaging/common/python/sync_minimum_supported_python_version.py`, which is the only place either one is defined.
-The check installs the PyPI pins into a throwaway payload directory with `pip install --target`, the same way the builder assembles the payload, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
+It installs the PyPI pins into a throwaway payload directory with `pip install --target`, the same way the builder assembles the payload, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
 It needs the interpreter for the minimum supported Python version to be installed, because its pip must resolve the payload's transitive dependencies the way it would on that version; set `MINIMUM_SUPPORTED_PYTHON_INTERPRETER` to point at that interpreter if it is not on `PATH` under the default name.
-Run `.github/scripts/check-minimum-supported-python-version.sh --write` to drop the supported Python versions that fall below the minimum required Python version.
+Run `python3 packaging/common/python/sync_minimum_supported_python_version.py --write` to drop the supported Python versions that fall below the minimum required Python version.
 
 ```sh
 make check-minimum-supported-python-version
