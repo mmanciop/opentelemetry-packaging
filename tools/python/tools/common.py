@@ -137,7 +137,7 @@ SUPPORTED_PYTHON_VERSIONS_FILE_NAME = "supported_python_versions.json"
 # These scripts live outside packaging/, so every path they need is
 # derived from the repository root rather than from the directory they
 # sit in.
-_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 _PYTHON_PACKAGING_DIRECTORY = (
     _REPOSITORY_ROOT / "packaging" / "common" / "python")
