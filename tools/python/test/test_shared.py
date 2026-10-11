@@ -12,7 +12,7 @@ from shared import (
     derive_minimum_required_python_version_from_bundled_distributions,
     read_supported_python_versions,
 )
-from python_version_test_helpers import write_dist_info_with_requires_python
+from shared_test import write_dist_info_with_requires_python
 
 
 class TestDeriveMinimumRequiredPythonVersion(TestCase):

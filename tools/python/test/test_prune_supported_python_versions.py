@@ -10,7 +10,7 @@ from unittest import TestCase
 
 from shared import read_supported_python_versions
 from prune_supported_python_versions import prune_supported_python_versions
-from python_version_test_helpers import (
+from shared_test import (
     PRUNE_SCRIPT_PATH,
     SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE,
     run_payload_script,

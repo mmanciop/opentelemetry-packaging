@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from python_version_test_helpers import (
+from shared_test import (
     CHECK_SCRIPT_PATH,
     run_payload_script,
     write_dist_info_with_requires_python,

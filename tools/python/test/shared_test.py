@@ -1,11 +1,17 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Fixtures shared by the supported Python version test modules.
+"""Code shared by the supported Python version test modules.
 
-The file name deliberately does not match the test_*.py pattern that
-"unittest discover" uses, so this module is imported by the test modules
-rather than collected as one.
+Holds the paths of the three scripts under test, the path of the file
+they read, the two writers that build a payload and a versions file on
+disk, and the runner that invokes a script's work phase.
+
+The name deliberately does not match the test_*.py pattern that "unittest
+discover" uses, so this module is imported by the test modules rather than
+collected as one. It also cannot be called shared.py: PYTHONPATH puts
+tools/python/tools on sys.path alongside this directory, so a second
+module of that name would shadow the one the scripts share.
 """
 
 from collections.abc import Iterable

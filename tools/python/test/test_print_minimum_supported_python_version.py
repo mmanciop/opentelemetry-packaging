@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from shared import read_supported_python_versions
-from python_version_test_helpers import (
+from shared_test import (
     PRINT_SCRIPT_PATH,
     SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE,
     write_supported_python_versions_file,
