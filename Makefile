@@ -486,16 +486,12 @@ pyproto-unit-tests:
 			$(PYPROTO_VENDOR_DIR)/$$suite; \
 	done
 
-# Check that every interpreter listed in
-# packaging/builder/supported_python_versions.json, the JSON array that
-# packaging/builder/download.go embeds, is at or above the strictest
-# Requires-Python across the distributions that actually ship. The script
-# documents how the minimum required Python version is derived, why only the
-# shipped payload contributes to it, and why the interpreter for the minimum
-# supported Python version derives it; it also takes --write to drop the
-# supported Python versions below the minimum required Python version, and
-# reads MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR from the
-# environment.
+# Check that no supported Python version is below the minimum required Python
+# version. Both terms are defined in the module docstring of
+# packaging/common/python/sync_minimum_supported_python_version.py, which is
+# the only place either one is defined. The script wrapping it takes --write
+# as well, and reads MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR from
+# the environment.
 .PHONY: check-minimum-supported-python-version
 check-minimum-supported-python-version:
 	.github/scripts/check-minimum-supported-python-version.sh --check

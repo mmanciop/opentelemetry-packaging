@@ -3,49 +3,45 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-# Keep packaging/builder/supported_python_versions.json, the JSON array
-# packaging/builder/download.go embeds, in sync with the strictest
-# Requires-Python across the distributions that actually ship.
+# Prepares the inputs for sync_minimum_supported_python_version.py and runs it.
+# The module docstring of packaging/common/python/
+# sync_minimum_supported_python_version.py defines the minimum supported
+# Python version and the minimum required Python version, and is the only
+# place either term is defined.
 #
 # Usage: check-minimum-supported-python-version.sh [--check|--write]
 #
-#   --check (the default) fails when a supported Python version is below
-#   the minimum required Python version.
-#   --write drops the supported Python versions below the minimum required
-#   Python version.
+# Both modes are the tool's; this script only passes them through.
 #
 # Environment:
 #
 #   MINIMUM_SUPPORTED_PYTHON_INTERPRETER
-#                   Interpreter that derives the minimum required Python
-#                   version (default: the minimum supported Python
-#                   version, as pythonX.Y).
+#                   Interpreter used to build the payload (default: the
+#                   minimum supported Python version, as pythonX.Y).
 #   BUILD_DIR       Scratch directory for the venv and the payload
 #                   (default: build/ at the repository root, removed by
 #                   "make clean").
 #
-# The PyPI pins (excluding the vendored source lines) are installed with
+# This script exists because the tool cannot assemble its own payload. The
+# PyPI pins (excluding the vendored source lines) are installed with
 # pip install --target into a throwaway payload directory, the same way
 # packaging/builder/download.go assembles the payload for the DEB and the RPM,
-# and sync_minimum_supported_python_version.py enumerates only that directory. A
-# virtualenv would additionally contain pip and setuptools from "python -m venv"
-# plus the tool's own tomli, none of which ship; since the minimum required
-# Python version is a maximum, a non-shipped distribution can only raise it,
-# which would mask a value that should drop while the check still reported
-# "in sync".
+# and the tool then enumerates only that directory. Installing into a
+# virtualenv instead would add pip, setuptools and the tool's own tomli, none
+# of which ship; the tool's docstring explains why including a non-shipped
+# distribution is one-directional and silent.
 #
 # The vendored requires-python values are read straight from each vendor
 # pyproject.toml via --vendor-dir, so the vendored source does not need to be
 # built for the check.
 #
-# The venv that runs the tool is built with the interpreter for the minimum
-# supported Python version on purpose: its pip must resolve the payload's
-# transitive dependencies the way it would on that version, so a newer release
-# of a transitive dependency that raised its own Requires-Python does not
-# inflate the minimum required Python version above what actually runs on the
-# interpreter for the minimum supported Python version. tomli is the tomllib
-# backport the tool falls back to under Python 3.10 (tomllib is standard
-# library from 3.11).
+# The venv is built with the interpreter for the minimum supported Python
+# version on purpose: its pip must resolve the payload's transitive
+# dependencies the way it would on that version, so a newer release of a
+# transitive dependency that raised its own Requires-Python does not inflate
+# the minimum required Python version above what actually runs there. tomli is
+# the tomllib backport the tool falls back to under Python 3.10 (tomllib is
+# standard library from 3.11).
 
 set -euo pipefail
 
