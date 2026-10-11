@@ -11,10 +11,11 @@ MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR.
 
 This script only ever removes entries from
 packaging/builder/supported_python_versions.json. Adding an interpreter to
-that file is a hand edit. Run check-supported-python-versions.py to see what
+that file is a hand edit. Run check_supported_python_versions.py to see what
 this script would drop without writing anything.
 """
 
+from json import dumps
 from pathlib import Path
 from sys import stderr
 
@@ -26,9 +27,31 @@ from common import (
     derive_minimum_required_python_version_from_bundled_distributions,
     format_python_versions,
     prepare_payload_and_rerun_in_the_virtualenv,
-    prune_supported_python_versions,
     read_supported_python_versions,
 )
+
+
+def prune_supported_python_versions(
+        supported_python_versions_text, minimum_required_python_version):
+    """Return the supported Python versions JSON without the ones below.
+
+    minimum_required_python_version is a (major, minor) pair. Raises
+    ValueError if pruning would empty the list, which would mean no
+    interpreter the builder knows about can run the bundled distributions
+    at all.
+    """
+    kept = [
+        version
+        for version in read_supported_python_versions(
+            supported_python_versions_text)
+        if version >= minimum_required_python_version]
+    if not kept:
+        raise ValueError(
+            "pruning to the minimum required Python version {}.{} would "
+            "empty {}".format(
+                *minimum_required_python_version,
+                SUPPORTED_PYTHON_VERSIONS_FILE_NAME))
+    return dumps(["{}.{}".format(*version) for version in kept]) + "\n"
 
 
 def main():

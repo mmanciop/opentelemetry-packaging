@@ -1,7 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for check-supported-python-versions.py."""
+"""Unit tests for check_supported_python_versions.py."""
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -237,11 +237,11 @@ class TestCheckOutcome(TestCase):
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("3.10", completed.stderr)
         self.assertIn(
-            "prune-supported-python-versions.py", completed.stderr)
+            "prune_supported_python_versions.py", completed.stderr)
 
     def test_check_leaves_the_supported_python_versions_file_untouched(self):
         # The check must never write, however stale the list is. Only
-        # prune-supported-python-versions.py rewrites the file.
+        # prune_supported_python_versions.py rewrites the file.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             payload_directory = temporary_path / "payload"

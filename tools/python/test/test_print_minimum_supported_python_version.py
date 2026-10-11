@@ -1,7 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for print-minimum-supported-python-version.py."""
+"""Unit tests for print_minimum_supported_python_version.py."""
 
 from pathlib import Path
 from subprocess import run

@@ -498,11 +498,11 @@ pyproto-unit-tests:
 # variables MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR are documented
 # in the module docstring of tools/python/tools/common.py, which is the only
 # place either term is defined. Run
-# tools/python/tools/prune-supported-python-versions.py to drop the versions
+# tools/python/tools/prune_supported_python_versions.py to drop the versions
 # this reports.
 .PHONY: check-supported-python-versions
 check-supported-python-versions:
-	python3 tools/python/tools/check-supported-python-versions.py
+	python3 tools/python/tools/check_supported_python_versions.py
 
 # ============================================================================
 # Lint

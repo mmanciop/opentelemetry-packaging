@@ -1,7 +1,7 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for prune-supported-python-versions.py."""
+"""Unit tests for prune_supported_python_versions.py."""
 
 from json import loads
 from pathlib import Path
@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from common import read_supported_python_versions
+from prune_supported_python_versions import prune_supported_python_versions
 from python_version_test_helpers import (
     PRUNE_SCRIPT_PATH,
     SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE,
@@ -18,7 +19,57 @@ from python_version_test_helpers import (
 )
 
 
-class TestPruneSupportedPythonVersions(TestCase):
+class TestPruneTheSupportedPythonVersionsText(TestCase):
+    """Pruning, exercised against the versions the package actually ships.
+
+    The input is read from packaging/builder/supported_python_versions.json
+    rather than restated here, so that editing that file cannot leave these
+    tests asserting against a list the package no longer ships.
+    """
+
+    def setUp(self):
+        self.shipped_text = SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE.read_text(
+            encoding="utf-8")
+        self.shipped_versions = read_supported_python_versions(
+            self.shipped_text)
+        self.assertGreater(
+            len(self.shipped_versions), 1,
+            "these tests need at least two supported Python versions")
+
+    def test_prune_drops_only_the_supported_python_versions_below_the_minimum_required_python_version(
+            self):
+        second_lowest_version = sorted(self.shipped_versions)[1]
+
+        pruned = read_supported_python_versions(
+            prune_supported_python_versions(
+                self.shipped_text, second_lowest_version))
+
+        self.assertNotIn(min(self.shipped_versions), pruned)
+        self.assertEqual(len(pruned), len(self.shipped_versions) - 1)
+        self.assertEqual(min(pruned), second_lowest_version)
+
+    def test_prune_output_matches_the_shipped_file_formatting(self):
+        # The pruned text is written back over the file the Go builder
+        # embeds, so a prune run must not reformat it into something a
+        # reviewer sees as an unrelated change. Pruning at the lowest shipped
+        # version drops nothing, so the output has to be the input verbatim.
+        self.assertEqual(
+            prune_supported_python_versions(
+                self.shipped_text, min(self.shipped_versions)),
+            self.shipped_text)
+
+    def test_prune_below_every_supported_python_version_changes_nothing(self):
+        self.assertEqual(
+            read_supported_python_versions(
+                prune_supported_python_versions(self.shipped_text, (3, 0))),
+            self.shipped_versions)
+
+    def test_prune_that_would_empty_the_list_raises(self):
+        with self.assertRaises(ValueError):
+            prune_supported_python_versions(self.shipped_text, (9, 99))
+
+
+class TestPruneScriptEndToEnd(TestCase):
 
     def test_prune_drops_the_supported_python_versions_below_the_minimum_required_python_version(
             self):

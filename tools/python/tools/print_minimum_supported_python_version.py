@@ -9,7 +9,7 @@ script, which is the only place either term is defined.
 
 This script needs no virtualenv and no payload directory, so CI can run it to
 decide which interpreter to install before running
-check-supported-python-versions.py.
+check_supported_python_versions.py.
 """
 
 from pathlib import Path

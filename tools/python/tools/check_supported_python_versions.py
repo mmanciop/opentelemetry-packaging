@@ -10,7 +10,7 @@ phases this script runs in, why a supported Python version below the minimum
 required Python version is an error while the converse is not, and the
 environment variables MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR.
 
-This script never writes a file. Run prune-supported-python-versions.py to
+This script never writes a file. Run prune_supported_python_versions.py to
 drop the versions it reports.
 """
 
@@ -62,7 +62,7 @@ def main():
         print(
             "{} lists {} below the minimum required Python version {}.{}; "
             "pip cannot resolve the payload for those interpreters. Run "
-            "prune-supported-python-versions.py to drop them.".format(
+            "prune_supported_python_versions.py to drop them.".format(
                 SUPPORTED_PYTHON_VERSIONS_FILE_NAME,
                 format_python_versions(
                     below_minimum_required_python_version),

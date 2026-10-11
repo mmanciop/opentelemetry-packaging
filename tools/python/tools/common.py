@@ -23,7 +23,7 @@ Supported Python versions
 
 Minimum supported Python version
     The lowest of the supported Python versions.
-    print-minimum-supported-python-version.py prints it.
+    print_minimum_supported_python_version.py prints it.
 
 Minimum required Python version
     The maximum, over every distribution the package bundles, of the lowest
@@ -45,17 +45,19 @@ Minimum required Python version
     and nothing here would notice that 3.10 is excluded.
 
 The three scripts that import this module
-    print-minimum-supported-python-version.py prints the minimum supported
+    print_minimum_supported_python_version.py prints the minimum supported
     Python version and exits. CI runs it to decide which interpreter to
     install before running the check.
 
-    check-supported-python-versions.py exits 1 when a supported Python
+    check_supported_python_versions.py exits 1 when a supported Python
     version is below the minimum required Python version.
 
-    prune-supported-python-versions.py drops the supported Python versions
-    that are below the minimum required Python version.
+    prune_supported_python_versions.py drops the supported Python versions
+    that are below the minimum required Python version. It owns the pruning
+    itself, since no other script needs it; this module holds only what more
+    than one script in this directory uses.
 
-check-supported-python-versions.py and prune-supported-python-versions.py
+check_supported_python_versions.py and prune_supported_python_versions.py
 each run in two phases, in two different interpreters.
 
 The preparation phase runs under whatever python3 invoked the script. It
@@ -112,7 +114,7 @@ refactor.
 
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from importlib.metadata import distributions
-from json import JSONDecodeError, dumps, loads
+from json import JSONDecodeError, loads
 from os import environ
 from pathlib import Path
 from shutil import rmtree, which
@@ -213,61 +215,9 @@ def read_supported_python_versions(supported_python_versions_text):
     return versions
 
 
-def prune_supported_python_versions(
-        supported_python_versions_text, minimum_required_python_version):
-    """Return the supported Python versions JSON without the ones below.
-
-    minimum_required_python_version is a (major, minor) pair. Raises
-    ValueError if pruning would empty the list, which would mean no
-    interpreter the builder knows about can run the bundled distributions
-    at all.
-    """
-    kept = [
-        version
-        for version in read_supported_python_versions(
-            supported_python_versions_text)
-        if version >= minimum_required_python_version]
-    if not kept:
-        raise ValueError(
-            "pruning to the minimum required Python version {}.{} would "
-            "empty {}".format(
-                *minimum_required_python_version,
-                SUPPORTED_PYTHON_VERSIONS_FILE_NAME))
-    return dumps(["{}.{}".format(*version) for version in kept]) + "\n"
-
-
 def format_python_versions(versions):
     """Return a comma-separated "major.minor" rendering of the given pairs."""
     return ", ".join("{}.{}".format(*version) for version in versions)
-
-
-def derive_minimum_required_python_version(requires_python_strings):
-    """Return the minimum required Python version as a (major, minor) pair.
-
-    See the module docstring for what that value is and why it is a maximum
-    of per-distribution minimums. Each item is a Requires-Python string, for
-    example ">=3.10" or "~=3.11,!=3.12.*". Strings that are empty or None are
-    ignored, because a distribution that declares no Requires-Python
-    constrains nothing. Returns None when no item constrains anything.
-    """
-    from packaging.specifiers import SpecifierSet
-    from packaging.version import Version
-
-    per_specifier_minimums = []
-    for requires_python in requires_python_strings:
-        if not requires_python:
-            continue
-        specifier_set = SpecifierSet(requires_python)
-        lowest_admitted = None
-        for major, minor in _CANDIDATE_PYTHON_VERSIONS:
-            if specifier_set.contains(Version("{}.{}".format(major, minor))):
-                lowest_admitted = (major, minor)
-                break
-        if lowest_admitted is not None:
-            per_specifier_minimums.append(lowest_admitted)
-    if not per_specifier_minimums:
-        return None
-    return max(per_specifier_minimums)
 
 
 def derive_minimum_required_python_version_from_bundled_distributions(
@@ -291,8 +241,11 @@ def derive_minimum_required_python_version_from_bundled_distributions(
             "no distributions found in payload directory {}: it is missing "
             "or empty, and must be populated with pip install --target "
             "before running this script".format(payload_directory))
+    # .get rather than subscripting: a distribution that declares no
+    # Requires-Python has no such field, and subscripting a missing field is
+    # deprecated and slated to raise KeyError.
     requires_python_strings = [
-        distribution.metadata["Requires-Python"]
+        distribution.metadata.get("Requires-Python")
         for distribution in shipped_distributions]
 
     try:
@@ -305,12 +258,29 @@ def derive_minimum_required_python_version_from_bundled_distributions(
         requires_python_strings.append(
             pyproject_data.get("project", {}).get("requires-python"))
 
-    minimum_required_python_version = derive_minimum_required_python_version(
-        requires_python_strings)
-    if minimum_required_python_version is None:
+    # Each Requires-Python is reduced to the lowest candidate version it
+    # admits, and the answer is the maximum of those. A string that is empty
+    # or None is skipped, because a distribution declaring no Requires-Python
+    # constrains nothing.
+    from packaging.specifiers import SpecifierSet
+    from packaging.version import Version
+
+    per_distribution_minimums = []
+    for requires_python in requires_python_strings:
+        if not requires_python:
+            continue
+        specifier_set = SpecifierSet(requires_python)
+        for candidate_version in _CANDIDATE_PYTHON_VERSIONS:
+            if specifier_set.contains(
+                    Version("{}.{}".format(*candidate_version))):
+                per_distribution_minimums.append(candidate_version)
+                break
+
+    if not per_distribution_minimums:
         raise MinimumRequiredPythonVersionError(
             "could not derive the minimum required Python version: no "
             "distribution or vendored pyproject declared Requires-Python")
+    minimum_required_python_version = max(per_distribution_minimums)
     if minimum_required_python_version[0] != 3:
         raise MinimumRequiredPythonVersionError(
             "the minimum required Python version has major version {}, not "

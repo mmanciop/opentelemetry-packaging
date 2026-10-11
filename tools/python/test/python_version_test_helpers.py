@@ -16,13 +16,13 @@ from sys import executable
 _TOOLS_DIRECTORY = Path(__file__).resolve().parents[1] / "tools"
 
 CHECK_SCRIPT_PATH = str(
-    _TOOLS_DIRECTORY / "check-supported-python-versions.py")
+    _TOOLS_DIRECTORY / "check_supported_python_versions.py")
 
 PRINT_SCRIPT_PATH = str(
-    _TOOLS_DIRECTORY / "print-minimum-supported-python-version.py")
+    _TOOLS_DIRECTORY / "print_minimum_supported_python_version.py")
 
 PRUNE_SCRIPT_PATH = str(
-    _TOOLS_DIRECTORY / "prune-supported-python-versions.py")
+    _TOOLS_DIRECTORY / "prune_supported_python_versions.py")
 
 SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE = (
     Path(__file__).resolve().parents[3] / "packaging" / "builder"
@@ -35,17 +35,20 @@ def write_dist_info_with_requires_python(
 
     This is the minimum importlib.metadata needs to enumerate a distribution
     and report its Requires-Python, so a payload can be assembled offline
-    without installing anything.
+    without installing anything. Passing None for requires_python omits the
+    field, which is how a distribution that constrains nothing looks.
     """
     dist_info_directory = payload_directory / "{}-{}.dist-info".format(
         name, version)
     dist_info_directory.mkdir(parents=True)
-    (dist_info_directory / "METADATA").write_text(
+    metadata = (
         "Metadata-Version: 2.1\n"
         "Name: {}\n"
-        "Version: {}\n"
-        "Requires-Python: {}\n".format(name, version, requires_python),
-        encoding="utf-8")
+        "Version: {}\n".format(name, version))
+    if requires_python is not None:
+        metadata += "Requires-Python: {}\n".format(requires_python)
+    (dist_info_directory / "METADATA").write_text(
+        metadata, encoding="utf-8")
 
 
 def write_supported_python_versions_file(
