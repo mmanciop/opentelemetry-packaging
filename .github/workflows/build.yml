@@ -46,8 +46,8 @@ jobs:
       - name: Resolve the minimum supported Python version
         id: minimum_supported_python_version
         run: |
-          version="$(python3 packaging/common/python/sync_minimum_supported_python_version.py \
-            --print-minimum-supported-python-version)"
+          version="$(python3 \
+            packaging/common/python/print-minimum-supported-python-version.py)"
           test -n "${version}"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
 
@@ -57,7 +57,7 @@ jobs:
           python-version: ${{ steps.minimum_supported_python_version.outputs.version }}
 
       - name: Check the supported Python versions are in sync with the bundled distributions
-        run: make check-minimum-supported-python-version
+        run: make check-supported-python-versions
 
   sitecustomize-compatibility-tests:
     runs-on: ubuntu-26.04

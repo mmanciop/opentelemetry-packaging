@@ -400,11 +400,11 @@ integration-test-rpm-vendor: local-rpm-repo local-rpm-vendor-repo
 go-unit-tests:
 	go test -v ./cmd/...
 
-# Unit tests for sitecustomize.py and sync_minimum_supported_python_version.py. They need
-# the `packaging` module (a runtime dependency of sitecustomize.py itself) and,
-# under Python 3.10, the `tomli` backport that sync_minimum_supported_python_version.py
-# falls back to where the stdlib tomllib is absent; a throwaway virtualenv keeps
-# the host Python untouched.
+# Unit tests for sitecustomize.py and for the supported Python version
+# scripts next to it. They need the `packaging` module (a runtime dependency
+# of sitecustomize.py itself) and, under Python 3.10, the `tomli` backport
+# that packaging/common/python/common.py falls back to where the stdlib
+# tomllib is absent; a throwaway virtualenv keeps the host Python untouched.
 .PHONY: python-unit-tests
 python-unit-tests:
 	python3 -m venv build/python-unit-tests-venv
@@ -489,12 +489,13 @@ pyproto-unit-tests:
 # Check that no supported Python version is below the minimum required Python
 # version. Both terms, the two phases this runs in, and the environment
 # variables MINIMUM_SUPPORTED_PYTHON_INTERPRETER and BUILD_DIR are documented
-# in the module docstring of
-# packaging/common/python/sync_minimum_supported_python_version.py, which is
-# the only place either term is defined. The same file takes --write.
-.PHONY: check-minimum-supported-python-version
-check-minimum-supported-python-version:
-	python3 packaging/common/python/sync_minimum_supported_python_version.py --check
+# in the module docstring of packaging/common/python/common.py, which is the
+# only place either term is defined. Run
+# packaging/common/python/prune-supported-python-versions.py to drop the
+# versions this reports.
+.PHONY: check-supported-python-versions
+check-supported-python-versions:
+	python3 packaging/common/python/check-supported-python-versions.py
 
 # ============================================================================
 # Lint

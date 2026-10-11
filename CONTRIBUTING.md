@@ -32,6 +32,8 @@ packaging/
     nodejs/                  " (plus register.js, the --require entry point with declarative-config support)
     dotnet/                  "
     python/                  Config, man page template, README, requirements.txt (version pins), sitecustomize.py (plus its unit tests)
+                             Also the supported Python version scripts: common.py (the definitions), print-minimum-supported-python-version.py,
+                             check-supported-python-versions.py, prune-supported-python-versions.py (plus their unit tests)
       vendor/                The pyproto exporter chain, developed here with its test suites (unpublished pure-Python packages; see its README)
   repo/                      APT and YUM repository generation scripts
   tests/                     Integration tests
@@ -236,13 +238,13 @@ make python-unit-tests
 ### Supported Python versions check (fast, no containers)
 
 Checks that no supported Python version is below the minimum required Python version.
-Both terms are defined in the module docstring of `packaging/common/python/sync_minimum_supported_python_version.py`, which is the only place either one is defined.
+Both terms are defined in the module docstring of `packaging/common/python/common.py`, which is the only place either one is defined.
 It installs the PyPI pins into a throwaway payload directory with `pip install --target`, the same way the builder assembles the payload, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
 It needs the interpreter for the minimum supported Python version to be installed, because its pip must resolve the payload's transitive dependencies the way it would on that version; set `MINIMUM_SUPPORTED_PYTHON_INTERPRETER` to point at that interpreter if it is not on `PATH` under the default name.
-Run `python3 packaging/common/python/sync_minimum_supported_python_version.py --write` to drop the supported Python versions that fall below the minimum required Python version.
+Run `python3 packaging/common/python/prune-supported-python-versions.py` to drop the supported Python versions that fall below the minimum required Python version.
 
 ```sh
-make check-minimum-supported-python-version
+make check-supported-python-versions
 ```
 
 ### Pyproto exporter tests (fast, no containers)
