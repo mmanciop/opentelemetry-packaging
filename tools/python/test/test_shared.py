@@ -10,6 +10,7 @@ from unittest import TestCase
 from shared import (
     MinimumRequiredPythonVersionError,
     derive_minimum_required_python_version_from_bundled_distributions,
+    python_version_pair,
     read_supported_python_versions,
 )
 from shared_test import write_dist_info_with_requires_python
@@ -100,3 +101,21 @@ class TestReadSupportedPythonVersions(TestCase):
             with self.subTest(entry=entry):
                 with self.assertRaises(ValueError):
                     read_supported_python_versions("[{}]".format(entry))
+
+
+class TestPythonVersionPair(TestCase):
+    """The converter argparse uses for --lowest-resolvable-python-version."""
+
+    def test_a_major_minor_string_becomes_a_pair(self) -> None:
+        self.assertEqual(python_version_pair("3.10"), (3, 10))
+
+    def test_a_double_digit_major_is_accepted(self) -> None:
+        # Nothing here assumes a single-digit major, so the parser must not
+        # either.
+        self.assertEqual(python_version_pair("10.2"), (10, 2))
+
+    def test_a_malformed_version_raises(self) -> None:
+        for version_text in ("three.ten", "3", "3.", ".10", "3.10.1", ""):
+            with self.subTest(version_text=version_text):
+                with self.assertRaises(ValueError):
+                    python_version_pair(version_text)

@@ -190,6 +190,18 @@ def add_payload_arguments(argument_parser: ArgumentParser) -> None:
              "(default: packaging/common/python/vendor)")
 
 
+def python_version_pair(version_text: str) -> tuple[int, int]:
+    """Return the (major, minor) pair for a "major.minor" string.
+
+    Raises ValueError when version_text is not two dot-separated numbers.
+    """
+    major, _, minor = version_text.partition(".")
+    if not major.isdigit() or not minor.isdigit():
+        raise ValueError(
+            'expected a version like "3.10", found {!r}'.format(version_text))
+    return (int(major), int(minor))
+
+
 def read_supported_python_versions(
     supported_python_versions_text: str
 ) -> list[tuple[int, int]]:
@@ -215,13 +227,12 @@ def read_supported_python_versions(
                 SUPPORTED_PYTHON_VERSIONS_FILE_NAME))
     versions: list[tuple[int, int]] = []
     for entry in parsed:
-        major, _, minor = entry.partition(".") if isinstance(
-            entry, str) else ("", "", "")
-        if not major.isdigit() or not minor.isdigit():
+        try:
+            versions.append(python_version_pair(entry))
+        except (AttributeError, ValueError) as error:
             raise ValueError(
                 '{} entries must be strings like "3.10", found {!r}'.format(
-                    SUPPORTED_PYTHON_VERSIONS_FILE_NAME, entry))
-        versions.append((int(major), int(minor)))
+                    SUPPORTED_PYTHON_VERSIONS_FILE_NAME, entry)) from error
     return versions
 
 
