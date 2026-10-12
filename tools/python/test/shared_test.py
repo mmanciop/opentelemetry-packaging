@@ -3,9 +3,9 @@
 
 """Code shared by the supported Python version test modules.
 
-Holds the paths of the three scripts under test, the path of the file
-they read, the two writers that build a payload and a versions file on
-disk, and the runner that invokes a script's work phase.
+Holds the paths of the three scripts under test, the path of the file they
+read, the two writers that build the bundled distributions and a versions
+file on disk, and the runner that invokes a script's work phase.
 
 The name deliberately does not match the test_*.py pattern that "unittest
 discover" uses, so this module is imported by the test modules rather than
@@ -37,20 +37,21 @@ SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE: Path = (
 
 
 def write_dist_info_with_requires_python(
-    payload_directory: Path,
+    bundled_distributions_directory: Path,
     name: str,
     version: str,
     requires_python: str | None,
 ) -> None:
-    """Create a <name>-<version>.dist-info/METADATA under payload_directory.
+    """Create a dist-info/METADATA in bundled_distributions_directory.
 
     This is the minimum importlib.metadata needs to enumerate a distribution
-    and report its Requires-Python, so a payload can be assembled offline
-    without installing anything. Passing None for requires_python omits the
-    field, which is how a distribution that constrains nothing looks.
+    and report its Requires-Python, so bundled distributions can be
+    assembled offline without installing anything. Passing None for
+    requires_python omits the field, which is how a distribution that
+    constrains nothing looks.
     """
-    dist_info_directory = payload_directory / "{}-{}.dist-info".format(
-        name, version)
+    dist_info_directory = bundled_distributions_directory / (
+        "{}-{}.dist-info".format(name, version))
     dist_info_directory.mkdir(parents=True)
     metadata: str = (
         "Metadata-Version: 2.1\n"
@@ -70,24 +71,24 @@ def write_supported_python_versions_file(
         dumps(list(versions)) + "\n", encoding="utf-8")
 
 
-def run_payload_script(
+def run_bundled_distributions_script(
     script_path: str,
-    payload_directory: Path,
+    bundled_distributions_directory: Path,
     vendor_directory: Path,
     supported_python_versions_path: Path,
     lowest_resolvable_python_version: str | None = None,
 ) -> CompletedProcess[str]:
-    """Run a payload script's work phase and return the completed run.
+    """Run a script's work phase and return the completed run.
 
-    Passing --payload-dir selects the work phase directly, so no virtualenv
-    is built and no distribution is downloaded. Passing
+    Passing --bundled-distributions-dir selects the work phase directly, so
+    no virtualenv is built and no distribution is downloaded. Passing
     lowest_resolvable_python_version stands in for what the preparation phase
     would have found, so the versions pip could not resolve can be exercised
     without resolving anything.
     """
     command: list[str] = [
         executable, script_path,
-        "--payload-dir", str(payload_directory),
+        "--bundled-distributions-dir", str(bundled_distributions_directory),
         "--vendor-dir", str(vendor_directory),
         "--supported-python-versions-file",
         str(supported_python_versions_path),

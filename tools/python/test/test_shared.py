@@ -17,34 +17,36 @@ from shared_test import write_dist_info_with_requires_python
 
 
 class TestDeriveMinimumRequiredPythonVersion(TestCase):
-    """The derivation, driven by payload directories built in a temp dir.
+    """The derivation, driven by bundled distributions built in a temp dir.
 
-    Each case writes the dist-info metadata a real payload carries, so the
-    Requires-Python strings reach the derivation the way they do in a build,
-    with no pip and no network.
+    Each case writes the dist-info metadata a real bundled distribution
+    carries, so the Requires-Python strings reach the derivation the way
+    they do in a build, with no pip and no network.
     """
 
     def derive_from_requires_python(
         self, *requires_python_strings: str | None
     ) -> tuple[int, int]:
-        """Return the value derived from a payload declaring these strings.
+        """Return the value derived from bundled distributions declaring these.
 
         None stands for a distribution that ships no Requires-Python at all,
         which is written as a METADATA file without that field.
         """
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
-            payload_directory.mkdir()
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
+            bundled_distributions_directory.mkdir()
             for index, requires_python in enumerate(requires_python_strings):
                 write_dist_info_with_requires_python(
-                    payload_directory, "thing{}".format(index), "1.0",
+                    bundled_distributions_directory,
+                    "thing{}".format(index), "1.0",
                     requires_python)
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
 
             return derive_minimum_required_python_version_from_bundled_distributions(
-                str(payload_directory), str(vendor_directory))
+                str(bundled_distributions_directory), str(vendor_directory))
 
     def test_strictest_lower_bound_wins(self) -> None:
         self.assertEqual(
@@ -63,13 +65,14 @@ class TestDeriveMinimumRequiredPythonVersion(TestCase):
         with self.assertRaises(MinimumRequiredPythonVersionError):
             self.derive_from_requires_python(None, None)
 
-    def test_an_empty_payload_directory_raises(self) -> None:
+    def test_an_empty_bundled_distributions_directory_raises(self) -> None:
         with self.assertRaises(MinimumRequiredPythonVersionError):
             self.derive_from_requires_python()
 
     def test_a_major_version_other_than_3_raises(self) -> None:
         # The data file and the sitecustomize.py gate only handle 3.x, so a
-        # 4.x-only payload has to stop the run rather than be mis-derived.
+        # 4.x-only bundled distribution has to stop the run rather than be
+        # mis-derived.
         with self.assertRaises(MinimumRequiredPythonVersionError):
             self.derive_from_requires_python(">=4.0")
 

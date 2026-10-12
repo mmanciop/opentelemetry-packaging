@@ -7,8 +7,8 @@ The minimum supported Python version and the supported Python versions it is
 the lowest of are defined in the module docstring of shared.py, next to this
 script, which is the only place either term is defined.
 
-This script needs no virtualenv and no payload directory, so CI can run it to
-decide which interpreter to install before running
+This script needs no virtualenv and no bundled distributions, so CI can run
+it to decide which interpreter to install before running
 check_supported_python_versions.py.
 """
 

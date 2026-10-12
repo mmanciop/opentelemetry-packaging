@@ -250,7 +250,7 @@ PYTHONPATH=tools/python/tools python3 -m unittest discover --start-directory too
 
 Checks that no supported Python version is below the minimum required Python version.
 Both terms are defined in the module docstring of `tools/python/tools/shared.py`, which is the only place either one is defined.
-It installs the PyPI pins into a throwaway payload directory with `pip install --target --python-version <target> --only-binary=:all:`, the same way the builder assembles the payload, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
+It installs the PyPI pins into a throwaway bundled distributions directory with `pip install --target --python-version <target> --only-binary=:all:`, the same way the builder assembles the bundled distributions, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
 It runs under whatever `python3` is on `PATH` and needs no other interpreter installed, because pip treats `--python-version` as a resolution target rather than an interpreter to run.
 It resolves for each supported Python version in ascending order and stops at the first that resolves, so a version whose pins no longer resolve is reported as one the package can no longer be built for, even when the metadata of what did resolve would not show it.
 Run `python3 tools/python/tools/prune_supported_python_versions.py` to drop the supported Python versions that fall below the minimum required Python version.

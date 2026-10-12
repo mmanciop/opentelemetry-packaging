@@ -19,9 +19,10 @@ from shared_test import (
 
 class TestPrintMinimumSupportedPythonVersion(TestCase):
 
-    def test_prints_the_lowest_entry_and_needs_no_payload(self) -> None:
+    def test_prints_the_lowest_entry_and_needs_no_bundled_distributions(self) -> None:
         # CI runs this before any interpreter is installed, to decide which
-        # one to install, so it must work without a virtualenv or a payload.
+        # one to install, so it must work without a virtualenv or any
+        # bundled distributions.
         # The entries are out of order so that the lowest one rather than the
         # first one is what gets printed.
         with TemporaryDirectory() as temporary_directory:

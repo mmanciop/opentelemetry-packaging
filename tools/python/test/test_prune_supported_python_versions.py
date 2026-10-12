@@ -13,7 +13,7 @@ from prune_supported_python_versions import prune_supported_python_versions
 from shared_test import (
     PRUNE_SCRIPT_PATH,
     SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE,
-    run_payload_script,
+    run_bundled_distributions_script,
     write_dist_info_with_requires_python,
     write_supported_python_versions_file,
 )
@@ -22,20 +22,23 @@ from shared_test import (
 class TestPruningWhatPipCouldNotResolve(TestCase):
     """The case that used to be unfixable: a pin stops supporting 3.10.
 
-    Before the payload was resolved with --python-version, pip refused to
-    build it at all for such a version, so this script died in its
-    preparation phase and could not drop the entry it exists to drop. The
-    floor the preparation phase now reports is what makes it possible.
+    Before the bundled distributions were resolved with --python-version,
+    pip refused to build them at all for such a version, so this script
+    died in its preparation phase and could not drop the entry it exists
+    to drop. The floor the preparation phase now reports is what makes it
+    possible.
     """
 
     def test_a_version_pip_could_not_resolve_is_dropped(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             # Resolved for 3.11, so its metadata still admits 3.10. Only the
             # floor carries the fact that 3.10 could not be resolved.
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.10")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.10")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -49,8 +52,9 @@ class TestPruningWhatPipCouldNotResolve(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
-            completed = run_payload_script(
-                PRUNE_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                PRUNE_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path,
                 lowest_resolvable_python_version="3.11")
 
@@ -136,9 +140,10 @@ class TestPruneScriptEndToEnd(TestCase):
 
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0",
+                bundled_distributions_directory, "shipped_thing", "1.0",
                 ">={}.{}".format(*shipped_versions[0]))
             vendor_directory = temporary_path / "vendor" / "high-requirement"
             vendor_directory.mkdir(parents=True)
@@ -152,8 +157,8 @@ class TestPruneScriptEndToEnd(TestCase):
             supported_python_versions_path.write_text(
                 shipped_text, encoding="utf-8")
 
-            completed = run_payload_script(
-                PRUNE_SCRIPT_PATH, payload_directory,
+            completed = run_bundled_distributions_script(
+                PRUNE_SCRIPT_PATH, bundled_distributions_directory,
                 temporary_path / "vendor", supported_python_versions_path)
             self.assertEqual(completed.returncode, 0, completed.stderr)
 
@@ -167,9 +172,11 @@ class TestPruneScriptEndToEnd(TestCase):
     def test_prune_writes_nothing_when_no_version_is_below(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.10")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.10")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -179,8 +186,9 @@ class TestPruneScriptEndToEnd(TestCase):
             before = supported_python_versions_path.read_text(
                 encoding="utf-8")
 
-            completed = run_payload_script(
-                PRUNE_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                PRUNE_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path)
 
             after = supported_python_versions_path.read_text(encoding="utf-8")

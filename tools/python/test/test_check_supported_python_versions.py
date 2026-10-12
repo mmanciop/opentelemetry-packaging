@@ -9,7 +9,7 @@ from unittest import TestCase
 
 from shared_test import (
     CHECK_SCRIPT_PATH,
-    run_payload_script,
+    run_bundled_distributions_script,
     write_dist_info_with_requires_python,
     write_supported_python_versions_file,
 )
@@ -19,20 +19,23 @@ class TestTheLowestResolvablePythonVersionFloor(TestCase):
     """What the preparation phase found pip could resolve raises the minimum.
 
     A pin that stops supporting an interpreter is invisible to the metadata
-    in the payload, because the payload can only hold what did resolve. The
-    preparation phase reports the lowest supported Python version it could
-    resolve for, and these cases drive that value in directly.
+    in the bundled distributions, because those can only be what did
+    resolve. The preparation phase reports the lowest supported Python
+    version it could resolve for, and these cases drive that value in
+    directly.
     """
 
     def test_a_floor_above_the_metadata_minimum_fails_the_check(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
-            # The payload says 3.10 is fine, which is what the metadata of
-            # whatever resolved always says. Only the floor knows 3.10 could
-            # not be resolved at all.
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
+            # The bundled distribution says 3.10 is fine, which is what
+            # the metadata of whatever resolved always says. Only the
+            # floor knows 3.10 could not be resolved at all.
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.10")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.10")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -46,8 +49,9 @@ class TestTheLowestResolvablePythonVersionFloor(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path,
                 lowest_resolvable_python_version="3.11")
 
@@ -61,9 +65,11 @@ class TestTheLowestResolvablePythonVersionFloor(TestCase):
     def test_a_floor_below_the_metadata_minimum_changes_nothing(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.11")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -77,8 +83,9 @@ class TestTheLowestResolvablePythonVersionFloor(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.11", "3.12"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path,
                 lowest_resolvable_python_version="3.11")
 
@@ -88,24 +95,26 @@ class TestTheLowestResolvablePythonVersionFloor(TestCase):
         self.assertIn("in sync", completed.stdout)
 
 
-class TestPayloadScopedEnumeration(TestCase):
+class TestBundledDistributionsScopedEnumeration(TestCase):
 
-    def test_minimum_required_python_version_comes_only_from_the_payload_directory(
+    def test_minimum_required_python_version_comes_only_from_the_bundled_distributions_directory(
         self
     ) -> None:
-        # The payload declares a single distribution at >=3.7, so the
+        # The bundled distributions hold a single one at >=3.7, so the
         # minimum required Python version is 3.7. The interpreter running
         # this test has packaging installed (>=3.9), plus pip and
         # setuptools from the throwaway venv the python-unit-tests target
         # builds. An enumeration that walked sys.path instead of
-        # --payload-dir would derive at least 3.9 from those, so seeing
-        # 3.7 reported is what proves the enumeration is scoped to the
-        # payload.
+        # --bundled-distributions-dir would derive at least 3.9 from those,
+        # so seeing 3.7 reported is what proves the enumeration is scoped
+        # to the bundled distributions.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.7")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.7")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -119,23 +128,27 @@ class TestPayloadScopedEnumeration(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.7", "3.8"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("minimum required Python version: 3.7", completed.stdout)
 
-    def test_strictest_payload_distribution_decides_the_minimum_required_python_version(
+    def test_strictest_bundled_distribution_decides_the_minimum_required_python_version(
         self
     ) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "lenient_thing", "1.0", ">=3.9")
+                bundled_distributions_directory,
+                "lenient_thing", "1.0", ">=3.9")
             write_dist_info_with_requires_python(
-                payload_directory, "strict_thing", "2.0", ">=3.11")
+                bundled_distributions_directory,
+                "strict_thing", "2.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -149,18 +162,20 @@ class TestPayloadScopedEnumeration(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.11", "3.12"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn(
             "minimum required Python version: 3.11", completed.stdout)
 
-    def test_missing_payload_directory_fails(self) -> None:
-        # A mistyped or unbuilt payload path must be an error rather than a
-        # derivation from the vendored pyproject files alone, which would
-        # silently report a minimum lower than the one the package ships.
+    def test_missing_bundled_distributions_directory_fails(self) -> None:
+        # A mistyped or unbuilt bundled distributions path must be an
+        # error rather than a derivation from the vendored pyproject files
+        # alone, which would silently report a minimum lower than the one
+        # the package ships.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
             vendor_directory = temporary_path / "vendor" / "some-package"
@@ -181,18 +196,20 @@ class TestPayloadScopedEnumeration(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, temporary_path / "no-such-payload",
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH,
+                temporary_path / "no-such-bundled-distributions",
                 temporary_path / "vendor", supported_python_versions_path)
 
         self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("no distributions found", completed.stderr)
+        self.assertIn("no bundled distributions found", completed.stderr)
 
-    def test_empty_payload_directory_fails(self) -> None:
+    def test_empty_bundled_distributions_directory_fails(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
-            payload_directory.mkdir()
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
+            bundled_distributions_directory.mkdir()
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -206,27 +223,30 @@ class TestPayloadScopedEnumeration(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path)
 
         self.assertNotEqual(completed.returncode, 0)
-        self.assertIn("no distributions found", completed.stderr)
+        self.assertIn("no bundled distributions found", completed.stderr)
 
 
 class TestVendorPyprojectParsing(TestCase):
 
     def test_check_reads_requires_python_from_vendor_pyproject(self) -> None:
-        # The payload minimum (3.8) is below the only vendored pyproject
-        # minimum (3.12), which must therefore drive the check to reject a
-        # list that still starts at 3.10. This proves the script reads
-        # [project].requires-python from pyproject.toml files under
-        # --vendor-dir.
+        # The bundled distributions minimum (3.8) is below the only
+        # vendored pyproject minimum (3.12), which must therefore drive
+        # the check to reject a list that still starts at 3.10. This
+        # proves the script reads [project].requires-python from
+        # pyproject.toml files under --vendor-dir.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.8")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.8")
             vendor_directory = temporary_path / "vendor" / "some-package"
             vendor_directory.mkdir(parents=True)
             (vendor_directory / "pyproject.toml").write_text(
@@ -245,8 +265,8 @@ class TestVendorPyprojectParsing(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
                 temporary_path / "vendor", supported_python_versions_path)
 
         self.assertNotEqual(completed.returncode, 0)
@@ -260,9 +280,11 @@ class TestCheckOutcome(TestCase):
     ) -> None:
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.11")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -276,8 +298,9 @@ class TestCheckOutcome(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.11", "3.12"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
@@ -288,12 +311,14 @@ class TestCheckOutcome(TestCase):
     ) -> None:
         # This is the regression the check exists for: a dependency bump
         # raises the minimum to 3.11 while the builder still tries to resolve
-        # the payload for 3.10, which pip cannot do.
+        # the bundled distributions for 3.10, which pip cannot do.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.11")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.11")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -307,8 +332,9 @@ class TestCheckOutcome(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path)
 
         self.assertNotEqual(completed.returncode, 0)
@@ -323,9 +349,11 @@ class TestCheckOutcome(TestCase):
         # prune_supported_python_versions.py rewrites the file.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.12")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.12")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -341,8 +369,9 @@ class TestCheckOutcome(TestCase):
             before = supported_python_versions_path.read_text(
                 encoding="utf-8")
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path)
 
             after = supported_python_versions_path.read_text(encoding="utf-8")
@@ -359,9 +388,11 @@ class TestCheckOutcome(TestCase):
         # than fails.
         with TemporaryDirectory() as temporary_directory:
             temporary_path = Path(temporary_directory)
-            payload_directory = temporary_path / "payload"
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
             write_dist_info_with_requires_python(
-                payload_directory, "shipped_thing", "1.0", ">=3.8")
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.8")
             vendor_directory = temporary_path / "vendor"
             vendor_directory.mkdir()
             supported_python_versions_path = (
@@ -375,8 +406,9 @@ class TestCheckOutcome(TestCase):
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11"])
 
-            completed = run_payload_script(
-                CHECK_SCRIPT_PATH, payload_directory, vendor_directory,
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
                 supported_python_versions_path)
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
