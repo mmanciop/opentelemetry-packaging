@@ -400,15 +400,9 @@ integration-test-rpm-vendor: local-rpm-repo local-rpm-vendor-repo
 go-unit-tests:
 	go test -v ./cmd/...
 
-# Unit tests for sitecustomize.py and for the supported Python version scripts
-# under tools/python/tools/. They need the `packaging` module (a runtime
-# dependency of sitecustomize.py itself) and, under Python 3.10, the `tomli`
-# backport that tools/python/tools/shared.py falls back to where the stdlib
-# tomllib is absent; a throwaway virtualenv keeps the host Python untouched.
-# The two suites are discovered separately so that neither directory has to be
-# importable from the other. PYTHONPATH is what lets tools/python/test/ import
-# shared.py from its sibling tools/python/tools/, which unittest discovery
-# puts on sys.path for neither.
+# Unit tests for sitecustomize.py. They need the `packaging` module (a runtime
+# dependency of sitecustomize.py itself); a throwaway virtualenv keeps the
+# host Python untouched.
 .PHONY: python-unit-tests
 python-unit-tests:
 	python3 -m venv build/python-unit-tests-venv
@@ -493,12 +487,6 @@ pyproto-unit-tests:
 			$(PYPROTO_VENDOR_DIR)/$$suite; \
 	done
 
-# Check that no supported Python version is below the minimum required Python
-# version. Both terms, the two phases this runs in, and the environment
-# variable BUILD_DIR are documented in the module docstring of
-# tools/python/tools/shared.py, which is the only place either term is
-# defined. Run tools/python/tools/prune_supported_python_versions.py to drop
-# the versions this reports.
 .PHONY: check-supported-python-versions
 check-supported-python-versions:
 	python3 tools/python/tools/check_supported_python_versions.py
