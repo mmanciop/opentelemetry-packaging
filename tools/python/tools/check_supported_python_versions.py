@@ -1,7 +1,11 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
-"""Fail when a supported Python version is below the minimum required one.
+"""Check that no supported Python version is below the minimum required one.
+
+Exits 1 and names the versions that are, so the message says which entries
+of packaging/builder/supported_python_versions.json stopped agreeing with
+what the package bundles.
 
 The supported Python versions and the minimum required Python version are
 defined in the module docstring of shared.py, next to this script, which is
@@ -11,7 +15,8 @@ required Python version is an error while the converse is not, and the
 environment variable BUILD_DIR.
 
 This script never writes a file. Run prune_supported_python_versions.py to
-drop the versions it reports.
+remove from packaging/builder/supported_python_versions.json any supported
+Python version that is below the minimum required Python version.
 """
 
 from pathlib import Path
