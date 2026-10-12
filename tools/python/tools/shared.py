@@ -63,15 +63,6 @@ from shutil import rmtree
 from subprocess import CalledProcessError, run
 from sys import executable, stderr
 
-# packaging and tomli are imported where they are used rather than here,
-# because the preparation phase runs under whatever python3 invoked the script
-# and neither is installed there. Only the work phase, which runs inside the
-# virtualenv the preparation phase builds, can import them.
-
-# The lowest major.minor pairs we scan when probing a specifier for the lowest
-# version it admits. Python 3 minors are the realistic range for this project;
-# major 4 is included so that a future 4.x-only minimum is detected and
-# reported as needing a refactor rather than silently mis-derived.
 _CANDIDATE_PYTHON_VERSIONS: list[tuple[int, int]] = [
     (3, minor) for minor in range(0, 31)
 ] + [
@@ -81,9 +72,6 @@ _CANDIDATE_PYTHON_VERSIONS: list[tuple[int, int]] = [
 SUPPORTED_PYTHON_VERSIONS_FILE_NAME: str = (
     "supported_python_versions.json")
 
-# These scripts live outside packaging/, so every path they need is
-# derived from the repository root rather than from the directory they
-# sit in.
 _REPOSITORY_ROOT: Path = Path(__file__).resolve().parents[3]
 
 _PYTHON_PACKAGING_DIRECTORY: Path = (
@@ -204,10 +192,6 @@ def derive_minimum_required_python_version_from_bundled_distributions(
     nothing declared a constraint, or when the derived major version is
     not 3.
     """
-    # The enumeration is scoped to the bundled distributions directory with
-    # path=; called with no arguments, distributions() would walk the
-    # running interpreter's sys.path and pick up pip, setuptools and tomli,
-    # which the DEB and the RPM never ship.
     shipped_distributions = list(
         distributions(path=[bundled_distributions_directory]))
     if not shipped_distributions:
@@ -216,9 +200,6 @@ def derive_minimum_required_python_version_from_bundled_distributions(
             "or empty, and must be populated with pip install --target "
             "before running this script".format(
                 bundled_distributions_directory))
-    # .get rather than subscripting: a distribution that declares no
-    # Requires-Python has no such field, and subscripting a missing field is
-    # deprecated and slated to raise KeyError.
     requires_python_strings = [
         distribution.metadata.get("Requires-Python")
         for distribution in shipped_distributions]
@@ -233,10 +214,6 @@ def derive_minimum_required_python_version_from_bundled_distributions(
         requires_python_strings.append(
             pyproject_data.get("project", {}).get("requires-python"))
 
-    # Each Requires-Python is reduced to the lowest candidate version it
-    # admits, and the answer is the maximum of those. A string that is empty
-    # or None is skipped, because a distribution declaring no Requires-Python
-    # constrains nothing.
     from packaging.specifiers import SpecifierSet
     from packaging.version import Version
 

@@ -43,12 +43,6 @@ class TestPruningWhatPipCouldNotResolve(TestCase):
             vendor_directory.mkdir()
             supported_python_versions_path = (
                 temporary_path / "supported_python_versions.json")
-            # This list is invented, not read from
-            # packaging/builder/supported_python_versions.json. The case
-            # needs a fixed relationship between these versions and the
-            # synthetic inputs above, so reading the shipped list would
-            # stop this test exercising what it was written for as soon
-            # as that file changes.
             write_supported_python_versions_file(
                 supported_python_versions_path, ["3.10", "3.11", "3.12"])
 
