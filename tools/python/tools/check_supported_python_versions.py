@@ -9,10 +9,7 @@ what the package bundles.
 
 The supported Python versions and the minimum required Python version are
 defined in the module docstring of shared.py, next to this script, which is
-the only place either term is defined. That docstring also documents the two
-phases this script runs in, why a supported Python version below the minimum
-required Python version is an error while the converse is not, and the
-environment variable BUILD_DIR.
+the only place either term is defined.
 
 This script never writes a file. Run prune_supported_python_versions.py to
 remove from packaging/builder/supported_python_versions.json any supported

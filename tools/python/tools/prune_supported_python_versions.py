@@ -5,8 +5,7 @@
 
 The supported Python versions and the minimum required Python version are
 defined in the module docstring of shared.py, next to this script, which is
-the only place either term is defined. That docstring also documents the two
-phases this script runs in and the environment variable BUILD_DIR.
+the only place either term is defined.
 
 This script only ever removes entries from
 packaging/builder/supported_python_versions.json. Adding an interpreter to
