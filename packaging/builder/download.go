@@ -512,8 +512,14 @@ func extractZipFile(f *zip.File, destDir string) (retErr error) {
 // pipTimeout is the maximum duration for a pip subprocess.
 const pipTimeout = 10 * time.Minute
 
-// Update packaging/common/python/README.md and the interpreter cases in
-// packaging/tests/python/sitecustomize_test.go after adding a new interpreter here.
+// supportedPythonVersions is the hand-maintained list of interpreters the
+// package is built for. Everything else that names them derives from this
+// file: writeSitecustomize generates the script's version gate from it, the
+// man page and README get it substituted in at build time, and
+// packaging/tests/python/sitecustomize_test.go reads it to generate its
+// interpreter cases. Adding or removing an entry here is therefore the whole
+// edit. The JSON can carry no comment of its own, which is why this note
+// lives here.
 var (
 	//go:embed supported_python_versions.json
 	supportedPythonVersionsJSON string

@@ -11,8 +11,11 @@ Supported Python versions
     The Python versions the package is built for, listed in
     packaging/builder/supported_python_versions.json as a JSON array of
     "major.minor" strings. Read that file for the current list. It is not
-    repeated here, nor in any test, so that editing it cannot leave a second
-    copy naming interpreters the package no longer ships.
+    repeated here, nor in any test, nor in the documentation the package
+    ships, so that editing it cannot leave a second copy naming interpreters
+    the package no longer ships. The man page and README are templates the
+    builder substitutes it into, and the interpreter cases in
+    packaging/tests/python/sitecustomize_test.go are generated from it.
 
     A person maintains that list by hand. packaging/builder/download.go
     embeds it, the builder resolves the bundled distributions once per

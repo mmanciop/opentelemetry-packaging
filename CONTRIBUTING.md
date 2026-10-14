@@ -31,7 +31,7 @@ packaging/
     java/                    "
     nodejs/                  " (plus register.js, the --require entry point with declarative-config support)
     dotnet/                  "
-    python/                  Config, man page template, README, requirements.txt (version pins), sitecustomize.py (plus its unit tests)
+    python/                  Config, man page and README templates, requirements.txt (version pins), sitecustomize.py (plus its unit tests)
       vendor/                The pyproto exporter chain, developed here with its test suites (unpublished pure-Python packages; see its README)
   repo/                      APT and YUM repository generation scripts
   tests/                     Integration tests
