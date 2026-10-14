@@ -10,6 +10,7 @@ from unittest import TestCase
 from shared import (
     MinimumRequiredPythonVersionError,
     derive_minimum_required_python_version_from_bundled_distributions,
+    is_resolution_failure,
     python_version_pair,
     read_supported_python_versions,
 )
@@ -104,6 +105,54 @@ class TestReadSupportedPythonVersions(TestCase):
             with self.subTest(entry=entry):
                 with self.assertRaises(ValueError):
                     read_supported_python_versions("[{}]".format(entry))
+
+
+class TestIsResolutionFailure(TestCase):
+    """What separates "this interpreter is out" from "pip had a bad day".
+
+    The outputs below are the ones pip actually prints, abbreviated to the
+    line that carries the verdict.
+    """
+
+    def test_an_unsatisfiable_requirement_is_a_resolution_failure(
+        self
+    ) -> None:
+        self.assertTrue(is_resolution_failure(
+            "ERROR: Could not find a version that satisfies the requirement "
+            "rpds-py==0.30.0 (from versions: none)\n"
+            "ERROR: No matching distribution found for rpds-py==0.30.0\n"))
+
+    def test_conflicting_dependencies_are_a_resolution_failure(self) -> None:
+        self.assertTrue(is_resolution_failure(
+            "ERROR: Cannot install -r requirements.txt (line 1) and "
+            "-r requirements.txt (line 2) because these package versions "
+            "have conflicting dependencies.\n"))
+
+    def test_a_requires_python_rejection_is_a_resolution_failure(
+        self
+    ) -> None:
+        self.assertTrue(is_resolution_failure(
+            "ERROR: Package 'thing' requires a different Python: "
+            "Requires-Python >=3.11\n"))
+
+    def test_a_network_outage_is_not_a_resolution_failure(self) -> None:
+        # The case that must never prune an interpreter: pip exits non-zero,
+        # but nothing it printed says the requirements cannot be satisfied.
+        self.assertFalse(is_resolution_failure(
+            "WARNING: Retrying (Retry(total=0, connect=None, read=None, "
+            "redirect=None, status=None)) after connection broken by "
+            "'NewConnectionError(...: Failed to establish a new "
+            "connection: [Errno -3] Temporary failure in name "
+            "resolution)': /simple/rpds-py/\n"
+            "ERROR: Could not install packages due to an OSError\n"))
+
+    def test_a_full_disk_is_not_a_resolution_failure(self) -> None:
+        self.assertFalse(is_resolution_failure(
+            "ERROR: Could not install packages due to an OSError: "
+            "[Errno 28] No space left on device\n"))
+
+    def test_an_interrupt_leaves_no_marker(self) -> None:
+        self.assertFalse(is_resolution_failure(""))
 
 
 class TestPythonVersionPair(TestCase):

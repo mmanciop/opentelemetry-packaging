@@ -47,6 +47,14 @@ Minimum required Python version
     the pins for a version is the property that actually decides whether the
     package can be built for it, so where the two disagree the resolution
     wins.
+
+    Only a resolution pip itself reported as impossible raises it. pip exits
+    non-zero for a network outage, a full disk or an interrupt just as it
+    does for an unsatisfiable requirement, and reading the first as the
+    second would report an interpreter as unbuildable — and let prune delete
+    it from the supported Python versions — on nothing but a bad PyPI
+    connection. A non-zero exit whose output carries none of the markers in
+    _RESOLUTION_FAILURE_MARKERS therefore stops the run instead.
 """
 
 from argparse import (
@@ -71,6 +79,14 @@ _CANDIDATE_PYTHON_VERSIONS: list[tuple[int, int]] = [
 
 SUPPORTED_PYTHON_VERSIONS_FILE_NAME: str = (
     "supported_python_versions.json")
+
+_RESOLUTION_FAILURE_MARKERS: tuple[str, ...] = (
+    "No matching distribution found",
+    "Could not find a version that satisfies the requirement",
+    "ResolutionImpossible",
+    "conflicting dependencies",
+    "Requires-Python",
+)
 
 _REPOSITORY_ROOT: Path = Path(__file__).resolve().parents[3]
 
@@ -172,6 +188,18 @@ def read_supported_python_versions(
                 '{} entries must be strings like "3.10", found {!r}'.format(
                     SUPPORTED_PYTHON_VERSIONS_FILE_NAME, entry)) from error
     return versions
+
+
+def is_resolution_failure(pip_output: str) -> bool:
+    """Return whether pip's output says it could not satisfy the requirements.
+
+    pip_output is pip's combined stdout and stderr. A non-zero exit that
+    carries none of these markers came from something other than the
+    requirements — a network outage, a full disk, an interrupt — and says
+    nothing about whether the interpreter is still supported.
+    """
+    return any(
+        marker in pip_output for marker in _RESOLUTION_FAILURE_MARKERS)
 
 
 def format_python_versions(versions: Iterable[tuple[int, int]]) -> str:
@@ -291,20 +319,34 @@ def prepare_bundled_distributions_and_rerun_in_the_virtualenv(
     lowest_resolvable_python_version: tuple[int, int] | None = None
     for python_version in sorted(supported_python_versions):
         rmtree(bundled_distributions_directory, ignore_errors=True)
-        resolution = run([
-            venv_python, "-m", "pip", "install", "--quiet",
-            "--target", str(bundled_distributions_directory),
-            "--python-version", "{}.{}".format(*python_version),
-            "--only-binary=:all:",
-            "-r", str(pinned_requirements_path)])
+        resolution = run(
+            [venv_python, "-m", "pip", "install", "--quiet",
+             "--target", str(bundled_distributions_directory),
+             "--python-version", "{}.{}".format(*python_version),
+             "--only-binary=:all:",
+             "-r", str(pinned_requirements_path)],
+            capture_output=True, text=True)
         if resolution.returncode == 0:
             lowest_resolvable_python_version = python_version
             break
+        pip_output = resolution.stdout + resolution.stderr
+        if not is_resolution_failure(pip_output):
+            print(
+                "error: pip exited {} for Python {}.{} without reporting a "
+                "resolution failure, so whether the pins still support that "
+                "interpreter is unknown. Fix what pip is reporting below and "
+                "run this again; nothing was concluded about {}.".format(
+                    resolution.returncode, *python_version,
+                    SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
+                file=stderr)
+            print(pip_output, file=stderr)
+            return resolution.returncode or 1
         print(
             "note: pip cannot resolve {} for Python {}.{}, so the package "
             "can no longer be built for it".format(
                 pinned_requirements_path.name, *python_version),
             file=stderr)
+        print(pip_output, file=stderr)
 
     if lowest_resolvable_python_version is None:
         print(
