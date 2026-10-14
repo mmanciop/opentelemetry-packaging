@@ -344,10 +344,42 @@ class TestCheckOutcome(TestCase):
             completed = run_bundled_distributions_script(
                 CHECK_SCRIPT_PATH, bundled_distributions_directory,
                 vendor_directory,
-                supported_python_versions_path)
+                supported_python_versions_path,
+                # What every real run passes: the preparation phase always
+                # reports the version it resolved for, and that version is
+                # always one of the supported ones. A note compared against
+                # the raised minimum rather than against what the metadata
+                # declares could therefore never be printed here.
+                lowest_resolvable_python_version="3.10")
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("would also permit 3.8", completed.stdout)
+        self.assertIn("would admit 3.8", completed.stdout)
+
+    def test_the_note_is_absent_when_the_metadata_permits_nothing_older(
+        self
+    ) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
+            write_dist_info_with_requires_python(
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.10")
+            vendor_directory = temporary_path / "vendor"
+            vendor_directory.mkdir()
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.10", "3.11"])
+
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory,
+                supported_python_versions_path,
+                lowest_resolvable_python_version="3.10")
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotIn("would admit", completed.stdout)
 
 
 class TestTheCommittedSitecustomizeGate(TestCase):

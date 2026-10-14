@@ -74,7 +74,7 @@ def main() -> int:
             __file__, supported_python_versions, arguments)
 
     try:
-        minimum_required_python_version = (
+        declared_python_version = (
             derive_minimum_required_python_version_from_bundled_distributions(
                 arguments.bundled_distributions_dirs,
                 arguments.vendor_dir))
@@ -82,6 +82,7 @@ def main() -> int:
         print(error, file=stderr)
         return 1
 
+    minimum_required_python_version = declared_python_version
     if arguments.lowest_resolvable_python_version is not None:
         minimum_required_python_version = max(
             minimum_required_python_version,
@@ -108,11 +109,18 @@ def main() -> int:
             file=stderr)
         return 1
 
-    if min(supported_python_versions) > minimum_required_python_version:
+    # Compared against what the metadata declares, not against the minimum
+    # required Python version: that one is raised to the lowest supported
+    # Python version pip could resolve for, which is itself a supported
+    # Python version, so the comparison could never hold.
+    if declared_python_version < min(supported_python_versions):
         print(
-            "note: the bundled distributions would also permit {}.{}, "
-            "which the package does not ship".format(
-                *minimum_required_python_version))
+            "note: the Requires-Python of the bundled distributions would "
+            "admit {}.{}, below every supported Python version. Whether the "
+            "pins resolve there was not tested, since only supported Python "
+            "versions are resolved, and wheel availability rather than "
+            "Requires-Python governs the list.".format(
+                *declared_python_version))
     print("supported Python versions are in sync")
     return 0
 
