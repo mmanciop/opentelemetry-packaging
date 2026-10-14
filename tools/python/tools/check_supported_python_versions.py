@@ -40,14 +40,15 @@ def main() -> int:
         Path(arguments.supported_python_versions_file).read_text(
             encoding="utf-8"))
 
-    if arguments.bundled_distributions_dir is None:
+    if arguments.bundled_distributions_dirs is None:
         return prepare_bundled_distributions_and_rerun_in_the_virtualenv(
             __file__, supported_python_versions, arguments)
 
     try:
         minimum_required_python_version = (
             derive_minimum_required_python_version_from_bundled_distributions(
-                arguments.bundled_distributions_dir, arguments.vendor_dir))
+                arguments.bundled_distributions_dirs,
+                arguments.vendor_dir))
     except MinimumRequiredPythonVersionError as error:
         print(error, file=stderr)
         return 1

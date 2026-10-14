@@ -29,9 +29,9 @@ Minimum required Python version
     The maximum, over every distribution the package bundles, of the lowest
     Python version that distribution's Requires-Python admits. "Every
     distribution the package bundles" means both those found in the
-    bundled distributions directory named by --bundled-distributions-dir
-    and those whose pyproject.toml is found under --vendor-dir. No person
-    writes this value down; it is computed.
+    bundled distributions directories named by --bundled-distributions-dir,
+    one per target architecture, and those whose pyproject.toml is found
+    under --vendor-dir. No person writes this value down; it is computed.
 
     It is the maximum of the per-distribution minimums rather than the
     minimum, because a Python version works for the package only if it works
@@ -55,6 +55,17 @@ Minimum required Python version
     it from the supported Python versions — on nothing but a bad PyPI
     connection. A non-zero exit whose output carries none of the markers in
     _RESOLUTION_FAILURE_MARKERS therefore stops the run instead.
+
+    The resolution targets the same platforms the builder does, not the
+    host: every target architecture in _TARGET_ARCHITECTURES, with the
+    implementation, ABI and manylinux platform tags that pipPlatformArgs
+    and manylinuxPlatforms in packaging/builder/download.go pass. The
+    closure carries compiled extensions, so resolving for the host would
+    answer a question nobody asked — whether the bundle could be built on a
+    maintainer's macOS arm64 laptop — while leaving the architectures the
+    packages are actually built for unchecked. A supported Python version
+    counts as resolvable only when it resolves for every target
+    architecture. These tags must stay in step with download.go.
 """
 
 from argparse import (
@@ -79,6 +90,13 @@ _CANDIDATE_PYTHON_VERSIONS: list[tuple[int, int]] = [
 
 SUPPORTED_PYTHON_VERSIONS_FILE_NAME: str = (
     "supported_python_versions.json")
+
+# The architectures packaging/builder builds the Python package for, mapped
+# to the machine name their manylinux platform tags carry.
+_TARGET_ARCHITECTURES: dict[str, str] = {
+    "amd64": "x86_64",
+    "arm64": "aarch64",
+}
 
 _RESOLUTION_FAILURE_MARKERS: tuple[str, ...] = (
     "No matching distribution found",
@@ -120,13 +138,16 @@ def add_bundled_distributions_arguments(
     """Add the options naming where the bundled distributions are found."""
     argument_parser.add_argument(
         "--bundled-distributions-dir",
+        action="append",
+        dest="bundled_distributions_dirs",
         default=None,
         help="directory holding the bundled distributions, as produced by "
              "pip install --target; only the bundled distributions found "
              "there contribute to the minimum required Python version. "
-             "Omit it to run the preparation phase, which builds the "
-             "bundled distributions and then re-invokes this script with "
-             "the directory it built")
+             "Repeat it once per target architecture, since a distribution "
+             "can resolve to a different version on each. Omit it to run "
+             "the preparation phase, which builds the bundled distributions "
+             "and then re-invokes this script with the directories it built")
     argument_parser.add_argument(
         "--vendor-dir",
         default=str(_PYTHON_PACKAGING_DIRECTORY / "vendor"),
@@ -190,6 +211,39 @@ def read_supported_python_versions(
     return versions
 
 
+def pip_target_platform_arguments(
+    python_version: tuple[int, int], architecture: str
+) -> list[str]:
+    """Return the pip flags pinning a resolution to a target platform.
+
+    These mirror pipPlatformArgs and manylinuxPlatforms in
+    packaging/builder/download.go: the same implementation, ABI tags and
+    manylinux platform tags, so what resolves here is what the builder can
+    resolve. architecture is a key of _TARGET_ARCHITECTURES; raises
+    ValueError for anything else.
+    """
+    try:
+        machine = _TARGET_ARCHITECTURES[architecture]
+    except KeyError as error:
+        raise ValueError(
+            "unsupported target architecture {!r}, expected one of {}".format(
+                architecture, ", ".join(sorted(_TARGET_ARCHITECTURES)))
+        ) from error
+    arguments = [
+        "--only-binary=:all:",
+        "--python-version", "{}.{}".format(*python_version),
+        "--implementation", "cp",
+        "--abi", "cp{}{}".format(*python_version),
+        "--abi", "abi3",
+        "--abi", "none",
+    ]
+    for platform_tag in (
+            "manylinux2014_{}", "manylinux_2_17_{}",
+            "manylinux_2_28_{}", "manylinux1_{}"):
+        arguments += ["--platform", platform_tag.format(machine)]
+    return arguments
+
+
 def is_resolution_failure(pip_output: str) -> bool:
     """Return whether pip's output says it could not satisfy the requirements.
 
@@ -208,26 +262,27 @@ def format_python_versions(versions: Iterable[tuple[int, int]]) -> str:
 
 
 def derive_minimum_required_python_version_from_bundled_distributions(
-    bundled_distributions_directory: str, vendor_directory: str
+    bundled_distributions_directories: list[str], vendor_directory: str
 ) -> tuple[int, int]:
     """Return the minimum required Python version of what the package ships.
 
-    Reads Requires-Python from every distribution installed in
-    bundled_distributions_directory and requires-python from every
-    pyproject.toml under vendor_directory, then derives the value as the
-    module docstring describes. Raises MinimumRequiredPythonVersionError
-    when the bundled distributions directory is missing or empty, when
-    nothing declared a constraint, or when the derived major version is
-    not 3.
+    Reads Requires-Python from every distribution installed in each of
+    bundled_distributions_directories — one per target architecture, since
+    a distribution can resolve to a different version on each — and
+    requires-python from every pyproject.toml under vendor_directory, then
+    derives the value as the module docstring describes. Raises
+    MinimumRequiredPythonVersionError when the bundled distributions
+    directories are all missing or empty, when nothing declared a
+    constraint, or when the derived major version is not 3.
     """
     shipped_distributions = list(
-        distributions(path=[bundled_distributions_directory]))
+        distributions(path=list(bundled_distributions_directories)))
     if not shipped_distributions:
         raise MinimumRequiredPythonVersionError(
-            "no bundled distributions found in {}: it is missing "
+            "no bundled distributions found in {}: they are missing "
             "or empty, and must be populated with pip install --target "
             "before running this script".format(
-                bundled_distributions_directory))
+                ", ".join(bundled_distributions_directories)))
     requires_python_strings = [
         distribution.metadata.get("Requires-Python")
         for distribution in shipped_distributions]
@@ -279,8 +334,9 @@ def prepare_bundled_distributions_and_rerun_in_the_virtualenv(
     """Build the virtualenv and bundled distributions, rerun script_path.
 
     This is the preparation phase the module docstring describes. Resolves the
-    pins for each supported Python version in ascending order, stopping at the
-    first that resolves, and passes that version to the work phase as
+    pins for each supported Python version in ascending order, for every
+    target architecture, stopping at the first version that resolves for all
+    of them, and passes that version to the work phase as
     --lowest-resolvable-python-version. Returns the exit status the caller
     should exit with: the rerun script's own status, or a non-zero one if a
     preparation step failed.
@@ -289,7 +345,7 @@ def prepare_bundled_distributions_and_rerun_in_the_virtualenv(
         environ.get("BUILD_DIR", str(_REPOSITORY_ROOT / "build")))
     venv_directory = (
         build_directory / "minimum-supported-python-version-venv")
-    bundled_distributions_directory = build_directory / (
+    bundled_distributions_root = build_directory / (
         "minimum-supported-python-version-bundled-distributions")
     pinned_requirements_path = (
         build_directory / "minimum-supported-python-version-requirements.txt")
@@ -317,54 +373,69 @@ def prepare_bundled_distributions_and_rerun_in_the_virtualenv(
             return error.returncode
 
     lowest_resolvable_python_version: tuple[int, int] | None = None
+    bundled_distributions_directories: list[Path] = []
     for python_version in sorted(supported_python_versions):
-        rmtree(bundled_distributions_directory, ignore_errors=True)
-        resolution = run(
-            [venv_python, "-m", "pip", "install", "--quiet",
-             "--target", str(bundled_distributions_directory),
-             "--python-version", "{}.{}".format(*python_version),
-             "--only-binary=:all:",
-             "-r", str(pinned_requirements_path)],
-            capture_output=True, text=True)
-        if resolution.returncode == 0:
-            lowest_resolvable_python_version = python_version
-            break
-        pip_output = resolution.stdout + resolution.stderr
-        if not is_resolution_failure(pip_output):
+        resolved_directories: list[Path] = []
+        for architecture in sorted(_TARGET_ARCHITECTURES):
+            target_directory = bundled_distributions_root / "{}.{}-{}".format(
+                *python_version, architecture)
+            rmtree(target_directory, ignore_errors=True)
+            resolution = run(
+                [venv_python, "-m", "pip", "install", "--quiet",
+                 "--target", str(target_directory),
+                 "-r", str(pinned_requirements_path)]
+                + pip_target_platform_arguments(python_version, architecture),
+                capture_output=True, text=True)
+            if resolution.returncode == 0:
+                resolved_directories.append(target_directory)
+                continue
+            pip_output = resolution.stdout + resolution.stderr
+            if not is_resolution_failure(pip_output):
+                print(
+                    "error: pip exited {} for Python {}.{} on linux/{} "
+                    "without reporting a resolution failure, so whether the "
+                    "pins still support that interpreter is unknown. Fix "
+                    "what pip is reporting below and run this again; nothing "
+                    "was concluded about {}.".format(
+                        resolution.returncode, *python_version, architecture,
+                        SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
+                    file=stderr)
+                print(pip_output, file=stderr)
+                return resolution.returncode or 1
             print(
-                "error: pip exited {} for Python {}.{} without reporting a "
-                "resolution failure, so whether the pins still support that "
-                "interpreter is unknown. Fix what pip is reporting below and "
-                "run this again; nothing was concluded about {}.".format(
-                    resolution.returncode, *python_version,
-                    SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
+                "note: pip cannot resolve {} for Python {}.{} on linux/{}, "
+                "so the package can no longer be built for it".format(
+                    pinned_requirements_path.name, *python_version,
+                    architecture),
                 file=stderr)
             print(pip_output, file=stderr)
-            return resolution.returncode or 1
-        print(
-            "note: pip cannot resolve {} for Python {}.{}, so the package "
-            "can no longer be built for it".format(
-                pinned_requirements_path.name, *python_version),
-            file=stderr)
-        print(pip_output, file=stderr)
+            break
+        else:
+            lowest_resolvable_python_version = python_version
+            bundled_distributions_directories = resolved_directories
+            break
 
     if lowest_resolvable_python_version is None:
         print(
             "error: pip cannot resolve {} for any supported Python version "
-            "({}). Every supported Python version would have to be dropped, "
-            "which would leave {} empty, so this needs a pin reverted or a "
-            "newer interpreter added by hand.".format(
+            "({}) on every target architecture ({}). Every supported Python "
+            "version would have to be dropped, which would leave {} empty, "
+            "so this needs a pin reverted or a newer interpreter added by "
+            "hand.".format(
                 pinned_requirements_path.name,
                 format_python_versions(sorted(supported_python_versions)),
+                ", ".join(sorted(_TARGET_ARCHITECTURES)),
                 SUPPORTED_PYTHON_VERSIONS_FILE_NAME),
             file=stderr)
         return 1
 
-    return run([
-        venv_python, script_path,
-        "--bundled-distributions-dir", str(bundled_distributions_directory),
+    command = [venv_python, script_path]
+    for directory in bundled_distributions_directories:
+        command += ["--bundled-distributions-dir", str(directory)]
+    command += [
         "--vendor-dir", arguments.vendor_dir,
         "--lowest-resolvable-python-version",
         "{}.{}".format(*lowest_resolvable_python_version),
         "--supported-python-versions-file",
-        arguments.supported_python_versions_file]).returncode
+        arguments.supported_python_versions_file]
+    return run(command).returncode

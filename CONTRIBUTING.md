@@ -252,7 +252,9 @@ Checks that no supported Python version is below the minimum required Python ver
 Both terms are defined in the module docstring of `tools/python/tools/shared.py`, which is the only place either one is defined.
 It installs the PyPI pins into a throwaway bundled distributions directory with `pip install --target --python-version <target> --only-binary=:all:`, the same way the builder assembles the bundled distributions, and reads the vendored `requires-python` values straight from each `pyproject.toml`.
 It runs under whatever `python3` is on `PATH` and needs no other interpreter installed, because pip treats `--python-version` as a resolution target rather than an interpreter to run.
-It resolves for each supported Python version in ascending order and stops at the first that resolves, so a version whose pins no longer resolve is reported as one the package can no longer be built for, even when the metadata of what did resolve would not show it.
+For the same reason it also passes the implementation, ABI, and manylinux platform tags the builder passes, once per target architecture, so what it resolves is what the builder can resolve rather than what the maintainer's own machine happens to have wheels for.
+It resolves for each supported Python version in ascending order and stops at the first that resolves on every target architecture, so a version whose pins no longer resolve is reported as one the package can no longer be built for, even when the metadata of what did resolve would not show it.
+Only a failure pip itself reported as unsatisfiable counts: any other non-zero exit — a PyPI outage, a full disk — stops the run instead, so that a bad connection cannot be mistaken for an interpreter the package has outgrown.
 Run `python3 tools/python/tools/prune_supported_python_versions.py` to drop the supported Python versions that fall below the minimum required Python version.
 
 ```sh
