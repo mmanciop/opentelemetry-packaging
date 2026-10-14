@@ -241,10 +241,23 @@ make python-unit-tests
 ```
 
 The second suite lives in `tools/python/test/` and imports `shared.py` from its sibling `tools/python/tools/`, which `unittest discover` does not put on `sys.path`.
-Running it by hand therefore needs `PYTHONPATH`:
+It also derives the minimum required Python version in-process, which imports `packaging`, and `tomli` on interpreters older than 3.11.
+A bare `python3` usually carries neither, so running the suite by hand means building the same virtualenv the make target builds:
 
 ```sh
-PYTHONPATH=tools/python/tools python3 -m unittest discover --start-directory tools/python/test
+python3 -m venv build/python-unit-tests-venv
+```
+
+Then install what the derivation imports:
+
+```sh
+build/python-unit-tests-venv/bin/pip install packaging tomli
+```
+
+Then run the suite, with `PYTHONPATH` pointing at the scripts under test:
+
+```sh
+PYTHONPATH=tools/python/tools build/python-unit-tests-venv/bin/python -m unittest discover --start-directory tools/python/test
 ```
 
 ### Supported Python versions check (fast, no containers)
