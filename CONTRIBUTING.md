@@ -86,6 +86,7 @@ The `cmd/build-packages` program:
    The builder writes the set it resolved into the script by replacing the module-level `supported_python_versions` line marked with the `supported-python-versions` comment, and the script's version gate is a membership test against that list.
    The list holds the same `"3.10"`-style strings as the JSON, in the same order, so the two can be compared as they stand.
    Change `packaging/builder/supported_python_versions.json` and the gate follows; never edit that line by hand.
+   The copy committed in `sitecustomize.py` still has to equal the JSON, because `packaging/common/python/test_sitecustomize.py` reads it to decide which interpreters the gate must admit: `make check-supported-python-versions` compares the two, and `prune_supported_python_versions.py` rewrites both.
 
 2. **Constructs an `nfpm.Info`** for each component with the correct metadata:
    - `Provides` virtual package names (e.g., `opentelemetry-injector1`)

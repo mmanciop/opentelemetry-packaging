@@ -21,6 +21,14 @@ Supported Python versions
     hand-maintained statement of which interpreters the package supports.
     The gate is generated from it and must not be edited directly.
 
+    The copy committed in sitecustomize.py is only what an unbuilt
+    checkout shows; the builder overwrites it. It still has to equal the
+    JSON, because the sitecustomize.py unit tests read it to decide which
+    interpreters the gate must admit, and a stale copy would have them
+    assert the gate admits an interpreter the package no longer ships.
+    check_supported_python_versions.py compares the two, and
+    prune_supported_python_versions.py rewrites both.
+
 Minimum supported Python version
     The lowest of the supported Python versions.
     print_minimum_supported_python_version.py prints it.
@@ -78,6 +86,7 @@ from importlib.metadata import distributions
 from json import JSONDecodeError, loads
 from os import environ
 from pathlib import Path
+from re import Pattern, compile
 from shutil import rmtree
 from subprocess import CalledProcessError, run
 from sys import executable, stderr
@@ -110,6 +119,15 @@ _REPOSITORY_ROOT: Path = Path(__file__).resolve().parents[3]
 
 _PYTHON_PACKAGING_DIRECTORY: Path = (
     _REPOSITORY_ROOT / "packaging" / "common" / "python")
+
+SITECUSTOMIZE_FILE_NAME: str = "sitecustomize.py"
+
+# The same line writeSitecustomize in packaging/builder/download.go finds and
+# rewrites, matched the same way: by the trailing marker comment, requiring
+# exactly one match.
+_SITECUSTOMIZE_SUPPORTED_PYTHON_VERSIONS_PATTERN: Pattern[str] = compile(
+    r'supported_python_versions = \[([0-9". ,]*)\]'
+    r'  # supported-python-versions')
 
 
 class MinimumRequiredPythonVersionError(Exception):
@@ -163,6 +181,64 @@ def add_bundled_distributions_arguments(
              "required Python version to at least this, so that a version no "
              "longer resolvable is reported even when the metadata alone "
              "would not show it")
+
+
+def add_sitecustomize_argument(argument_parser: ArgumentParser) -> None:
+    """Add the option naming the sitecustomize.py whose gate mirrors the JSON."""
+    argument_parser.add_argument(
+        "--sitecustomize-file",
+        default=str(_PYTHON_PACKAGING_DIRECTORY / SITECUSTOMIZE_FILE_NAME),
+        help="path to the sitecustomize.py carrying the generated "
+             "supported-python-versions line "
+             "(default: the one in this repository)")
+
+
+def read_sitecustomize_supported_python_versions(
+    sitecustomize_text: str
+) -> list[tuple[int, int]]:
+    """Return the versions the sitecustomize.py gate is committed with.
+
+    Finds the generated line by its trailing supported-python-versions
+    marker, the way writeSitecustomize in packaging/builder/download.go
+    finds it. Raises ValueError unless there is exactly one such line and it
+    lists "major.minor" strings.
+    """
+    listed = _SITECUSTOMIZE_SUPPORTED_PYTHON_VERSIONS_PATTERN.findall(
+        sitecustomize_text)
+    if len(listed) != 1:
+        raise ValueError(
+            "expected exactly 1 supported-python-versions marker in {}, "
+            "found {}".format(SITECUSTOMIZE_FILE_NAME, len(listed)))
+    try:
+        return read_supported_python_versions("[{}]".format(listed[0]))
+    except ValueError as error:
+        raise ValueError(
+            "the supported-python-versions line in {} does not list "
+            '"major.minor" strings: {}'.format(
+                SITECUSTOMIZE_FILE_NAME, error)) from error
+
+
+def rewrite_sitecustomize_supported_python_versions(
+    sitecustomize_text: str, versions: Iterable[tuple[int, int]]
+) -> str:
+    """Return sitecustomize_text with the gate listing the given versions.
+
+    Writes the line the same way writeSitecustomize in
+    packaging/builder/download.go writes it, so a checkout and a built
+    package carry the same text. Raises ValueError unless there is exactly
+    one line to rewrite.
+    """
+    replacement = (
+        "supported_python_versions = [{}]  # supported-python-versions".format(
+            ", ".join('"{}.{}"'.format(*version) for version in versions)))
+    rewritten, rewritten_count = (
+        _SITECUSTOMIZE_SUPPORTED_PYTHON_VERSIONS_PATTERN.subn(
+            replacement, sitecustomize_text))
+    if rewritten_count != 1:
+        raise ValueError(
+            "expected exactly 1 supported-python-versions marker in {}, "
+            "found {}".format(SITECUSTOMIZE_FILE_NAME, rewritten_count))
+    return rewritten
 
 
 def python_version_pair(version_text: str) -> tuple[int, int]:
@@ -437,5 +513,6 @@ def prepare_bundled_distributions_and_rerun_in_the_virtualenv(
         "--lowest-resolvable-python-version",
         "{}.{}".format(*lowest_resolvable_python_version),
         "--supported-python-versions-file",
-        arguments.supported_python_versions_file]
+        arguments.supported_python_versions_file,
+        "--sitecustomize-file", arguments.sitecustomize_file]
     return run(command).returncode

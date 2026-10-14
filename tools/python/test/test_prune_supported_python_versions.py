@@ -8,13 +8,17 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from shared import read_supported_python_versions
+from shared import (
+    read_sitecustomize_supported_python_versions,
+    read_supported_python_versions,
+)
 from prune_supported_python_versions import prune_supported_python_versions
 from shared_test import (
     PRUNE_SCRIPT_PATH,
     SHIPPED_SUPPORTED_PYTHON_VERSIONS_FILE,
     run_bundled_distributions_script,
     write_dist_info_with_requires_python,
+    write_sitecustomize_file,
     write_supported_python_versions_file,
 )
 
@@ -190,3 +194,71 @@ class TestPruneScriptEndToEnd(TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("nothing to prune", completed.stdout)
         self.assertEqual(before, after)
+
+
+class TestRewritingTheCommittedSitecustomizeGate(TestCase):
+    """Pruning writes both files, so the two cannot drift apart.
+
+    The builder regenerates the gate for the package it stages, so this is
+    about the committed copy, which the sitecustomize.py unit tests read to
+    decide which interpreters the gate must admit.
+    """
+
+    def run_prune(
+        self,
+        json_versions: list[str],
+        gate_versions: list[str],
+        requires_python: str,
+    ) -> tuple[str, list[str]]:
+        """Prune with these inputs; return the run's stdout and the new gate."""
+        with TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
+            write_dist_info_with_requires_python(
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", requires_python)
+            vendor_directory = temporary_path / "vendor"
+            vendor_directory.mkdir()
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, json_versions)
+            sitecustomize_path = temporary_path / "sitecustomize.py"
+            write_sitecustomize_file(sitecustomize_path, gate_versions)
+
+            completed = run_bundled_distributions_script(
+                PRUNE_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory, supported_python_versions_path,
+                sitecustomize_path=sitecustomize_path)
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            gate = read_sitecustomize_supported_python_versions(
+                sitecustomize_path.read_text(encoding="utf-8"))
+
+        return completed.stdout, ["{}.{}".format(*version) for version in gate]
+
+    def test_a_pruned_version_leaves_the_gate(self) -> None:
+        stdout, gate = self.run_prune(
+            ["3.10", "3.11", "3.12"], ["3.10", "3.11", "3.12"], ">=3.11")
+
+        self.assertIn("dropped 3.10", stdout)
+        self.assertEqual(gate, ["3.11", "3.12"])
+
+    def test_a_gate_already_drifted_is_brought_back_with_nothing_to_prune(
+        self
+    ) -> None:
+        # Nothing to drop, yet the gate names an interpreter the JSON does
+        # not. Leaving it would keep the sitecustomize.py unit tests
+        # asserting against 3.10.
+        stdout, gate = self.run_prune(
+            ["3.11", "3.12"], ["3.10", "3.11", "3.12"], ">=3.11")
+
+        self.assertIn("nothing to prune", stdout)
+        self.assertEqual(gate, ["3.11", "3.12"])
+
+    def test_a_gate_already_in_step_is_not_rewritten(self) -> None:
+        stdout, gate = self.run_prune(
+            ["3.11", "3.12"], ["3.11", "3.12"], ">=3.11")
+
+        self.assertNotIn("wrote", stdout)
+        self.assertEqual(gate, ["3.11", "3.12"])

@@ -27,7 +27,11 @@ from sys import path, version, version_info, stderr
 # requiring exactly one match. The entries are the same strings the JSON holds,
 # in the same order, so the two can be compared without reformatting either.
 # To change which interpreters the bundle admits, change the JSON and rebuild;
-# the value committed here only has to stay equal to it.
+# the value committed here only has to stay equal to it. It has to, though:
+# test_sitecustomize.py reads this line to decide which interpreters the gate
+# must admit, so a stale copy would assert against interpreters the package no
+# longer ships. check_supported_python_versions.py compares the two, and
+# prune_supported_python_versions.py rewrites both.
 supported_python_versions = ["3.10", "3.11", "3.12", "3.13"]  # supported-python-versions
 
 # Distributions whose presence in the application means it is already

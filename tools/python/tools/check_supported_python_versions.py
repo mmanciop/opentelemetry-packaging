@@ -7,6 +7,11 @@ Exits 1 and names the versions that are, so the message says which entries
 of packaging/builder/supported_python_versions.json stopped agreeing with
 what the package bundles.
 
+Also checks that the generated supported-python-versions line committed in
+packaging/common/python/sitecustomize.py lists the same versions as that
+JSON, since the sitecustomize.py unit tests read the committed line to
+decide which interpreters the version gate must admit.
+
 The supported Python versions and the minimum required Python version are
 defined in the module docstring of shared.py, next to this script, which is
 the only place either term is defined.
@@ -20,13 +25,16 @@ from pathlib import Path
 from sys import stderr
 
 from shared import (
+    SITECUSTOMIZE_FILE_NAME,
     SUPPORTED_PYTHON_VERSIONS_FILE_NAME,
     MinimumRequiredPythonVersionError,
     add_bundled_distributions_arguments,
+    add_sitecustomize_argument,
     build_argument_parser,
     derive_minimum_required_python_version_from_bundled_distributions,
     format_python_versions,
     prepare_bundled_distributions_and_rerun_in_the_virtualenv,
+    read_sitecustomize_supported_python_versions,
     read_supported_python_versions,
 )
 
@@ -34,11 +42,32 @@ from shared import (
 def main() -> int:
     argument_parser = build_argument_parser(__doc__)
     add_bundled_distributions_arguments(argument_parser)
+    add_sitecustomize_argument(argument_parser)
     arguments = argument_parser.parse_args()
 
     supported_python_versions = read_supported_python_versions(
         Path(arguments.supported_python_versions_file).read_text(
             encoding="utf-8"))
+
+    # Cheap, needs no network, and a mismatch makes the sitecustomize.py unit
+    # tests assert against interpreters the package may no longer ship, so it
+    # runs before anything is resolved.
+    sitecustomize_python_versions = (
+        read_sitecustomize_supported_python_versions(
+            Path(arguments.sitecustomize_file).read_text(encoding="utf-8")))
+    if sitecustomize_python_versions != supported_python_versions:
+        print(
+            "the generated supported-python-versions line in {} lists {}, "
+            "but {} lists {}. The JSON is the source of truth; run "
+            "prune_supported_python_versions.py, or copy the list by hand, "
+            "so the committed gate matches what the builder would "
+            "write.".format(
+                SITECUSTOMIZE_FILE_NAME,
+                format_python_versions(sitecustomize_python_versions),
+                SUPPORTED_PYTHON_VERSIONS_FILE_NAME,
+                format_python_versions(supported_python_versions)),
+            file=stderr)
+        return 1
 
     if arguments.bundled_distributions_dirs is None:
         return prepare_bundled_distributions_and_rerun_in_the_virtualenv(

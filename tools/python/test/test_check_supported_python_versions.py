@@ -11,6 +11,7 @@ from shared_test import (
     CHECK_SCRIPT_PATH,
     run_bundled_distributions_script,
     write_dist_info_with_requires_python,
+    write_sitecustomize_file,
     write_supported_python_versions_file,
 )
 
@@ -347,3 +348,100 @@ class TestCheckOutcome(TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("would also permit 3.8", completed.stdout)
+
+
+class TestTheCommittedSitecustomizeGate(TestCase):
+    """The committed gate has to list what the JSON lists.
+
+    The builder overwrites that line in the copy it stages, so the shipped
+    package is right either way. The committed copy still matters: the
+    sitecustomize.py unit tests read it to decide which interpreters the
+    gate must admit, so drift there goes unnoticed while the tests assert
+    against interpreters the package may no longer ship.
+    """
+
+    def run_check_with_a_gate_listing(
+        self, gate_versions: list[str], json_versions: list[str]
+    ):
+        with TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
+            write_dist_info_with_requires_python(
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.10")
+            vendor_directory = temporary_path / "vendor"
+            vendor_directory.mkdir()
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, json_versions)
+            sitecustomize_path = temporary_path / "sitecustomize.py"
+            write_sitecustomize_file(sitecustomize_path, gate_versions)
+
+            return run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory, supported_python_versions_path,
+                sitecustomize_path=sitecustomize_path)
+
+    def test_a_gate_naming_a_dropped_interpreter_fails_the_check(
+        self
+    ) -> None:
+        # What a prune run that wrote only the JSON used to leave behind.
+        completed = self.run_check_with_a_gate_listing(
+            ["3.10", "3.11", "3.12"], ["3.11", "3.12"])
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("3.10, 3.11, 3.12", completed.stderr)
+        self.assertIn("sitecustomize.py", completed.stderr)
+
+    def test_a_gate_missing_an_added_interpreter_fails_the_check(
+        self
+    ) -> None:
+        completed = self.run_check_with_a_gate_listing(
+            ["3.11"], ["3.11", "3.12"])
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("sitecustomize.py", completed.stderr)
+
+    def test_a_gate_listing_the_same_versions_in_another_order_fails(
+        self
+    ) -> None:
+        # The builder writes the JSON's order, so the two can be compared as
+        # they stand; a reordered copy is a copy that was edited by hand.
+        completed = self.run_check_with_a_gate_listing(
+            ["3.12", "3.11"], ["3.11", "3.12"])
+
+        self.assertNotEqual(completed.returncode, 0)
+
+    def test_a_matching_gate_passes(self) -> None:
+        completed = self.run_check_with_a_gate_listing(
+            ["3.11", "3.12"], ["3.11", "3.12"])
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_a_sitecustomize_without_the_marker_fails_the_check(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            temporary_path = Path(temporary_directory)
+            bundled_distributions_directory = (
+                temporary_path / "bundled-distributions")
+            write_dist_info_with_requires_python(
+                bundled_distributions_directory,
+                "shipped_thing", "1.0", ">=3.10")
+            vendor_directory = temporary_path / "vendor"
+            vendor_directory.mkdir()
+            supported_python_versions_path = (
+                temporary_path / "supported_python_versions.json")
+            write_supported_python_versions_file(
+                supported_python_versions_path, ["3.11"])
+            sitecustomize_path = temporary_path / "sitecustomize.py"
+            sitecustomize_path.write_text(
+                "supported_python_versions = []\n", encoding="utf-8")
+
+            completed = run_bundled_distributions_script(
+                CHECK_SCRIPT_PATH, bundled_distributions_directory,
+                vendor_directory, supported_python_versions_path,
+                sitecustomize_path=sitecustomize_path)
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("marker", completed.stderr)

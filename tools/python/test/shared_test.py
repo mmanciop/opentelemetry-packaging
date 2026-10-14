@@ -15,7 +15,7 @@ module of that name would shadow the one the scripts share.
 """
 
 from collections.abc import Iterable
-from json import dumps
+from json import dumps, loads
 from pathlib import Path
 from subprocess import CompletedProcess, run
 from sys import executable
@@ -71,12 +71,29 @@ def write_supported_python_versions_file(
         dumps(list(versions)) + "\n", encoding="utf-8")
 
 
+def write_sitecustomize_file(
+    sitecustomize_path: Path, versions: Iterable[str]
+) -> None:
+    """Write a sitecustomize.py carrying only the line the scripts read.
+
+    The real file is the auto-instrumentation bootstrap; everything in it
+    other than the generated supported-python-versions line is irrelevant
+    to the scripts, which find that line by its trailing marker.
+    """
+    sitecustomize_path.write_text(
+        "supported_python_versions = [{}]"
+        "  # supported-python-versions\n".format(
+            ", ".join('"{}"'.format(version) for version in versions)),
+        encoding="utf-8")
+
+
 def run_bundled_distributions_script(
     script_path: str,
     bundled_distributions_directory: Path,
     vendor_directory: Path,
     supported_python_versions_path: Path,
     lowest_resolvable_python_version: str | None = None,
+    sitecustomize_path: Path | None = None,
 ) -> CompletedProcess[str]:
     """Run a script's work phase and return the completed run.
 
@@ -85,13 +102,25 @@ def run_bundled_distributions_script(
     lowest_resolvable_python_version stands in for what the preparation phase
     would have found, so the versions pip could not resolve can be exercised
     without resolving anything.
+
+    Without sitecustomize_path, a sitecustomize.py agreeing with
+    supported_python_versions_path is written next to it, which is the state
+    every case that is not about drift between the two needs.
     """
+    if sitecustomize_path is None:
+        sitecustomize_path = (
+            supported_python_versions_path.parent / "sitecustomize.py")
+        write_sitecustomize_file(
+            sitecustomize_path,
+            loads(supported_python_versions_path.read_text(
+                encoding="utf-8")))
     command: list[str] = [
         executable, script_path,
         "--bundled-distributions-dir", str(bundled_distributions_directory),
         "--vendor-dir", str(vendor_directory),
         "--supported-python-versions-file",
         str(supported_python_versions_path),
+        "--sitecustomize-file", str(sitecustomize_path),
     ]
     if lowest_resolvable_python_version is not None:
         command += [
