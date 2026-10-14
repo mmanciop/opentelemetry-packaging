@@ -531,9 +531,29 @@ func init() {
 	if err := json.Unmarshal([]byte(supportedPythonVersionsJSON), &supportedPythonVersions); err != nil {
 		panic(fmt.Sprintf("parsing supported_python_versions.json: %v", err))
 	}
-	if len(supportedPythonVersions) == 0 {
-		panic("supported_python_versions.json lists no Python version")
+	if err := validateSupportedPythonVersions(supportedPythonVersions); err != nil {
+		panic(err.Error())
 	}
+}
+
+// validateSupportedPythonVersions rejects a list the rest of the build cannot
+// work with. It runs at package initialization rather than where the entries
+// are first used, because every use is downstream of resolving, downloading
+// and verifying a wheel set per entry: writeSitecustomize applies the same
+// pattern, but only after all of that network work, and pythonABITag would
+// have turned "3.10.1" into the nonexistent "cp3101" long before then.
+func validateSupportedPythonVersions(versions []string) error {
+	if len(versions) == 0 {
+		return fmt.Errorf("supported_python_versions.json lists no Python version")
+	}
+	for _, pythonVersion := range versions {
+		if !pythonVersionPattern.MatchString(pythonVersion) {
+			return fmt.Errorf(
+				"supported_python_versions.json lists unsupported Python version %q, want \"3.N\"",
+				pythonVersion)
+		}
+	}
+	return nil
 }
 
 func pythonABITag(pythonVersion string) string {
