@@ -215,6 +215,37 @@ class TestIsResolutionFailure(TestCase):
             "resolution)': /simple/rpds-py/\n"
             "ERROR: Could not install packages due to an OSError\n"))
 
+    def test_an_unreachable_index_is_not_a_resolution_failure(self) -> None:
+        # The case the markers alone get wrong: pip reports the empty
+        # candidate set an unreachable index leaves it with in the very words
+        # of an unsatisfiable requirement. Only the retry it printed first
+        # tells the two apart. Captured verbatim from pip install --quiet
+        # against an index nothing is listening on, abbreviated to one of the
+        # five retries.
+        self.assertFalse(is_resolution_failure(
+            "WARNING: Retrying (Retry(total=4, connect=None, read=None, "
+            "redirect=None, status=None)) after connection broken by "
+            "'NewConnectionError('<pip._vendor.urllib3.connection."
+            "HTTPConnection object at 0x1025e7500>: Failed to establish a "
+            "new connection: [Errno 61] Connection refused')': "
+            "/simple/urllib3/\n"
+            "ERROR: Could not find a version that satisfies the requirement "
+            "urllib3<2.8.1 (from versions: none)\n"
+            "ERROR: No matching distribution found for urllib3<2.8.1\n"))
+
+    def test_a_read_timeout_is_not_a_resolution_failure(self) -> None:
+        # An index that accepts the connection and then stops answering
+        # reaches the same empty candidate set by a different route.
+        self.assertFalse(is_resolution_failure(
+            "WARNING: Retrying (Retry(total=0, connect=None, read=None, "
+            "redirect=None, status=None)) after connection broken by "
+            "'ReadTimeoutError(\"HTTPSConnectionPool(host='pypi.org', "
+            "port=443): Read timed out. (read timeout=15)\")': "
+            "/simple/rpds-py/\n"
+            "ERROR: Could not find a version that satisfies the requirement "
+            "rpds-py==0.30.0 (from versions: none)\n"
+            "ERROR: No matching distribution found for rpds-py==0.30.0\n"))
+
     def test_a_full_disk_is_not_a_resolution_failure(self) -> None:
         self.assertFalse(is_resolution_failure(
             "ERROR: Could not install packages due to an OSError: "

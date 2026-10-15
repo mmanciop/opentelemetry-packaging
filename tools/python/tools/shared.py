@@ -67,6 +67,14 @@ Minimum required Python version
     connection. A non-zero exit whose output carries none of the markers in
     _RESOLUTION_FAILURE_MARKERS therefore stops the run instead.
 
+    The markers alone do not separate the two, because an index pip cannot
+    reach yields a candidate set of none, and pip words that exactly as it
+    words a requirement nothing satisfies: "Could not find a version that
+    satisfies the requirement" and "No matching distribution found". What
+    tells the outage apart is the retry it printed first, so output carrying
+    any of _NETWORK_TROUBLE_MARKERS is never read as a resolution failure,
+    whichever other markers it also carries.
+
     The resolution targets the same platforms the builder does, not the
     host: every target architecture in _TARGET_ARCHITECTURES, with the
     implementation, ABI and manylinux platform tags that pipPlatformArgs
@@ -116,6 +124,22 @@ _RESOLUTION_FAILURE_MARKERS: tuple[str, ...] = (
     "ResolutionImpossible",
     "conflicting dependencies",
     "Requires-Python",
+)
+
+# What pip prints while failing to reach an index, before it goes on to
+# report the empty candidate set in the words of a resolution failure. These
+# are logged at WARNING level, which the single --quiet the preparation phase
+# passes keeps; a second -q would drop them and hide every outage behind a
+# resolution failure, so do not add one.
+_NETWORK_TROUBLE_MARKERS: tuple[str, ...] = (
+    "Retrying (Retry(",
+    "NewConnectionError",
+    "ConnectTimeoutError",
+    "ReadTimeoutError",
+    "ProxyError",
+    "SSLError",
+    "Temporary failure in name resolution",
+    "Network is unreachable",
 )
 
 _REPOSITORY_ROOT: Path = Path(__file__).resolve().parents[3]
@@ -328,9 +352,15 @@ def is_resolution_failure(pip_output: str) -> bool:
 
     pip_output is pip's combined stdout and stderr. A non-zero exit that
     carries none of these markers came from something other than the
-    requirements — a network outage, a full disk, an interrupt — and says
-    nothing about whether the interpreter is still supported.
+    requirements — a full disk, an interrupt — and says nothing about
+    whether the interpreter is still supported.
+
+    An index pip cannot reach is reported in the same words as a requirement
+    nothing satisfies, so output that also shows pip retrying a broken
+    connection is read as the outage it is, never as a resolution failure.
     """
+    if any(marker in pip_output for marker in _NETWORK_TROUBLE_MARKERS):
+        return False
     return any(
         marker in pip_output for marker in _RESOLUTION_FAILURE_MARKERS)
 
