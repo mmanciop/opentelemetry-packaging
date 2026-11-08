@@ -32,8 +32,6 @@ AutoReq:        no
 # Open Build Service: the package would ship group-writable directories. These
 # two commands are what it runs for both, so they set the umask nfpm packages
 # with instead.
-%global __mkdir_p umask 022 && /bin/mkdir -p
-%global __gzip umask 022 && /bin/gzip
 
 Name:           {{ .Name }}
 Version:        {{ .Version }}
